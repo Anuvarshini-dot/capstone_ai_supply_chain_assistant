@@ -1,0 +1,4 @@
+.dashboard-page { display: flex; flex-direction: column; gap: 20px; }
+
+.dashboard-header h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.dashboard-header p { font-size: 14px; color: var(--text-muted); }

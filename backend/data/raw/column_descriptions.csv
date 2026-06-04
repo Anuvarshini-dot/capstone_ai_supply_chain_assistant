@@ -1,0 +1,61 @@
+table_name,column_name,data_type,description,example_value
+suppliers,supplier_id,string,Unique identifier for each supplier,SUP-001
+suppliers,supplier_name,string,Legal or trade name of the supplying company,Apex Supply Co.
+suppliers,category,string,Product category the supplier specialises in,Electronics
+suppliers,country,string,Country where the supplier is headquartered,Germany
+suppliers,region,string,Broad geographic region of the supplier,Europe
+suppliers,on_time_delivery_rate,float,Proportion of deliveries made on or before scheduled date,0.92
+suppliers,defect_rate,float,Proportion of units received with quality defects,0.02
+suppliers,avg_lead_time_days,int,Average number of days from order placement to delivery,7
+suppliers,contract_value_usd,int,Total annual contract value with the supplier in USD,1500000
+suppliers,payment_terms,string,Agreed payment terms with the supplier,Net30
+suppliers,risk_tier,string,Overall risk classification: low / medium / high,low
+suppliers,reliability_score,float,Composite score: 0.7×on_time_delivery_rate + 0.3×(1−defect_rate),0.927
+suppliers,active,boolean,Whether the supplier is currently active,True
+warehouses,warehouse_id,string,Unique identifier for each warehouse,WH-01
+warehouses,warehouse_name,string,Descriptive name of the warehouse facility,Chicago Distribution Center
+warehouses,city,string,City in which the warehouse is located,Chicago
+warehouses,country,string,Country in which the warehouse is located,United States
+warehouses,region,string,Broad geographic region of the warehouse,USCA
+warehouses,capacity_units,int,Maximum number of stock-keeping units the warehouse can hold,45000
+warehouses,current_utilization_pct,float,Proportion of capacity currently in use,0.72
+products,product_id,string,Unique identifier for each product,PRD-001
+products,product_name,string,Descriptive commercial name of the product,14-inch Laptop Pro
+products,category,string,Product category matching the supplier's category,Electronics
+products,supplier_id,string,Foreign key referencing the product's primary supplier,SUP-001
+products,unit_cost_usd,float,Cost to procure one unit from the supplier in USD,450.00
+products,unit_price_usd,float,Selling price per unit inclusive of margin in USD,630.00
+products,weight_kg,float,Weight of a single unit in kilograms,1.8
+products,reorder_point_units,int,Stock level at which a replenishment order is triggered,200
+products,safety_stock_days,int,Number of days of demand covered by safety stock buffer,14
+inventory,inventory_id,string,Unique identifier for each inventory record,INV-0001
+inventory,product_id,string,Foreign key referencing the product held in this inventory row,PRD-001
+inventory,warehouse_id,string,Foreign key referencing the warehouse storing this inventory,WH-01
+inventory,stock_level_units,int,Current on-hand stock in units at this warehouse,850
+inventory,reorder_point_units,int,Reorder trigger level copied from the products table,200
+inventory,avg_daily_demand,float,Average units sold or consumed per day at this location,22.5
+inventory,days_of_supply,int,Estimated days of stock remaining at current demand rate,38
+inventory,last_replenishment_date,date,Date on which the last stock replenishment was received,2024-10-15
+inventory,stockout_count_30d,int,Number of stockout events recorded in the past 30 days,0
+inventory,status,string,Inventory health status: healthy / low / critical / stockout,healthy
+shipments,shipment_id,string,Unique identifier for each shipment,SHP-0001
+shipments,supplier_id,string,Foreign key referencing the supplying company,SUP-003
+shipments,product_id,string,Foreign key referencing the product being shipped,PRD-007
+shipments,destination_warehouse_id,string,Foreign key referencing the receiving warehouse,WH-05
+shipments,origin_city,string,City from which the shipment originates,Shanghai
+shipments,origin_country,string,Country from which the shipment originates,China
+shipments,destination_city,string,City of the destination warehouse,Chicago
+shipments,destination_country,string,Country of the destination warehouse,United States
+shipments,order_date,date,Date the purchase order was placed,2023-07-14
+shipments,scheduled_delivery_date,date,Expected delivery date based on supplier lead time,2023-07-28
+shipments,actual_delivery_date,date,Date the shipment was actually delivered,2023-07-30
+shipments,delay_days,int,Number of days the delivery was late (0 if on time),2
+shipments,shipping_mode,string,Mode of transport used for the shipment,Sea
+shipments,carrier,string,Name of the carrier or logistics provider,Maersk
+shipments,status,string,Current shipment status: Delivered / In Transit / Delayed / Cancelled,Delivered
+shipments,quantity_units,int,Number of product units included in the shipment,150
+shipments,shipment_cost_usd,float,Total freight cost calculated as qty × weight × mode rate,540.00
+shipments,is_late,int,Binary flag: 1 if delivery was late 0 if on time,0
+shipments,late_delivery_risk,float,Modelled probability that this shipment will be late (0–1),0.18
+shipments,severity,string,Delay severity: low (0 days) / medium (1–5 days) / high (>5 days),low
+shipments,risk_score,float,Composite risk: 0.45×min(delay/10,1)+0.30×ldr+0.15×defect_rate+0.10×is_late,0.071

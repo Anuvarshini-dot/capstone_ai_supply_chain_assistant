@@ -1,0 +1,197 @@
+.agent-trace {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.agent-trace__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-trace__header h3 { font-size: 15px; font-weight: 600; }
+
+.confidence-pill {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.confidence-pill strong { color: var(--accent); }
+
+.agent-list { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.agent-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.agent-card.open { border-color: var(--agent-color, var(--accent)); }
+
+.agent-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  width: 100%;
+  background: var(--bg-secondary);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.agent-card__header:hover { background: var(--bg-card-hover); }
+
+.agent-card__left { display: flex; align-items: center; gap: 10px; }
+.agent-icon { font-size: 18px; }
+.agent-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+.agent-card__right { display: flex; align-items: center; gap: 12px; }
+
+.risk-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid;
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.conf-text { font-size: 12px; color: var(--text-muted); }
+.chevron { font-size: 11px; color: var(--text-muted); }
+
+.agent-card__body {
+  padding: 16px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+}
+
+.agent-summary {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+.agent-findings { margin-bottom: 12px; }
+
+.findings-label, .tag-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.agent-findings ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-findings ul li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding-left: 14px;
+  position: relative;
+}
+
+.agent-findings ul li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+.agent-tags {
+  margin-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.tag.small { font-size: 11px; padding: 1px 6px; }
+
+.stockout-prob {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.stockout-prob strong { color: var(--warning); }
+
+.anomaly-section {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.anomaly-section__title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--warning);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.anomaly-section__title::before { content: '⚡'; }
+
+.anomaly-card {
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-left: 3px solid transparent;
+}
+
+.anomaly-card.anomaly-high {
+  background: rgba(239,68,68,0.08);
+  border-left-color: #ef4444;
+}
+
+.anomaly-card.anomaly-medium {
+  background: rgba(245,158,11,0.08);
+  border-left-color: var(--warning);
+}
+
+.anomaly-type {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.anomaly-card p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.anomaly-agents { display: flex; gap: 6px; flex-wrap: wrap; }

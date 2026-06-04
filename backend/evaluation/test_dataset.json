@@ -1,0 +1,32 @@
+[
+  {
+    "query": "Supplier delivery delays are increasing for critical components",
+    "expected_risk_level": "high",
+    "expected_keywords": ["delay", "supplier", "delivery"],
+    "ground_truth": "High supplier delivery delays indicate a significant supply chain risk requiring immediate intervention such as alternate sourcing or expedited shipping."
+  },
+  {
+    "query": "Warehouse inventory approaching stockout levels in Chicago",
+    "expected_risk_level": "high",
+    "expected_keywords": ["inventory", "stockout", "warehouse"],
+    "ground_truth": "Critical inventory depletion at Chicago warehouse poses immediate stockout risk. Emergency reorder and demand-side management needed."
+  },
+  {
+    "query": "Transportation costs increased unexpectedly across all regions",
+    "expected_risk_level": "medium",
+    "expected_keywords": ["transportation", "cost", "region"],
+    "ground_truth": "Unexpected transportation cost increases across multiple regions signal systemic logistics disruption, possibly due to fuel prices or carrier capacity issues."
+  },
+  {
+    "query": "Port congestion is causing shipment delays",
+    "expected_risk_level": "high",
+    "expected_keywords": ["port", "congestion", "shipment", "delay"],
+    "ground_truth": "Port congestion is a major logistics bottleneck causing cascading shipment delays. Rerouting and buffer stock strategies are essential."
+  },
+  {
+    "query": "Demand spikes causing fulfillment bottlenecks",
+    "expected_risk_level": "medium",
+    "expected_keywords": ["demand", "fulfillment", "bottleneck"],
+    "ground_truth": "Sudden demand spikes are overwhelming fulfillment capacity. Dynamic inventory rebalancing and expedited replenishment are recommended."
+  }
+]

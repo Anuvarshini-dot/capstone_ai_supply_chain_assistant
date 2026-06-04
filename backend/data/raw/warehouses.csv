@@ -1,0 +1,16 @@
+warehouse_id,warehouse_name,city,country,region,capacity_units,current_utilization_pct
+WH-01,Chicago Distribution Center,Chicago,United States,USCA,67154,0.45
+WH-02,Los Angeles Fulfillment Hub,Los Angeles,United States,USCA,35825,0.63
+WH-03,Toronto Logistics Center,Toronto,Canada,USCA,19171,0.92
+WH-04,Houston Supply Depot,Houston,United States,USCA,53279,0.76
+WH-05,Berlin Central Warehouse,Berlin,Germany,Europe,26334,0.81
+WH-06,Paris Distribution Hub,Paris,France,Europe,49363,0.7
+WH-07,London Regional Center,London,United Kingdom,Europe,63528,0.61
+WH-08,Amsterdam Port Facility,Amsterdam,Netherlands,Europe,48752,0.73
+WH-09,São Paulo Distribution Center,São Paulo,Brazil,LATAM,35144,0.66
+WH-10,Bogotá Logistics Hub,Bogotá,Colombia,LATAM,59695,0.79
+WH-11,Santiago Supply Depot,Santiago,Chile,LATAM,32810,0.76
+WH-12,Singapore Regional Hub,Singapore,Singapore,Pacific Asia,49446,0.65
+WH-13,Tokyo Distribution Center,Tokyo,Japan,Pacific Asia,10053,0.6
+WH-14,Johannesburg Supply Hub,Johannesburg,South Africa,Africa,37549,0.66
+WH-15,Lagos Distribution Center,Lagos,Nigeria,Africa,52237,0.68

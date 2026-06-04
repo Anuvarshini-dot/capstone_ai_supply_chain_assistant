@@ -1,0 +1,151 @@
+product_id,product_name,category,supplier_id,unit_cost_usd,unit_price_usd,weight_kg,reorder_point_units,safety_stock_days
+PRD-001,14-inch Laptop Pro,Electronics,SUP-001,887.11,1143.4,23.7,457,30
+PRD-002,Wireless Noise-Cancelling Headphones,Electronics,SUP-001,343.53,413.99,25.8,374,26
+PRD-003,4K Smart TV 55-inch,Electronics,SUP-001,673.7,1133.15,37.6,394,16
+PRD-004,Men's Slim-Fit Chinos,Apparel,SUP-002,453.16,579.79,1.3,175,22
+PRD-005,Women's Quilted Jacket,Apparel,SUP-002,1224.49,2019.82,22.8,372,25
+PRD-006,Unisex Hoodie,Apparel,SUP-002,392.9,629.67,24.8,174,11
+PRD-007,Men's Trail Running Shoes,Footwear,SUP-003,1313.84,1515.65,37.6,444,10
+PRD-008,Women's Slip-On Sneakers,Footwear,SUP-003,1557.95,2013.26,40.2,406,23
+PRD-009,Kids' School Shoes,Footwear,SUP-003,931.78,1409.14,45.9,112,21
+PRD-010,Ergonomic Office Chair,Furniture,SUP-004,271.01,393.51,26.6,336,26
+PRD-011,Solid Wood Dining Table,Furniture,SUP-004,638.01,1046.92,22.2,467,30
+PRD-012,3-Seat Fabric Sofa,Furniture,SUP-004,1784.58,2547.28,45.4,278,12
+PRD-013,Vitamin C Serum 30ml,Health & Beauty,SUP-005,1488.59,2171.17,13.0,176,27
+PRD-014,Collagen Face Cream,Health & Beauty,SUP-005,558.24,924.16,24.3,172,15
+PRD-015,Electric Toothbrush Kit,Health & Beauty,SUP-005,882.55,1424.26,11.8,221,17
+PRD-016,Organic Green Tea 100-Pack,Food & Beverage,SUP-006,1786.59,2148.15,7.6,246,29
+PRD-017,Dark Roast Coffee Beans 1kg,Food & Beverage,SUP-006,309.85,399.42,20.8,219,24
+PRD-018,Extra Virgin Olive Oil 500ml,Food & Beverage,SUP-006,934.52,1112.52,41.7,249,25
+PRD-019,Adjustable Dumbbell Set,Sports,SUP-007,1892.39,2200.27,44.0,344,19
+PRD-020,Yoga Mat Premium,Sports,SUP-007,956.57,1686.22,15.0,249,20
+PRD-021,Resistance Bands Kit,Sports,SUP-007,1078.75,1755.68,40.0,162,22
+PRD-022,Wi-Fi 6 Router,Technology,SUP-008,442.75,634.59,1.5,222,28
+PRD-023,Network Switch 24-Port,Technology,SUP-008,1359.89,1921.26,8.3,289,11
+PRD-024,Raspberry Pi 4 Kit,Technology,SUP-008,1961.54,2936.78,45.4,353,25
+PRD-025,Portable Bluetooth Speaker,Electronics,SUP-009,1327.68,1599.28,21.5,493,21
+PRD-026,USB-C Docking Station,Electronics,SUP-009,367.55,484.84,16.4,282,17
+PRD-027,Digital Camera Kit,Electronics,SUP-009,678.31,1167.89,14.0,475,20
+PRD-028,Men's Formal Shirt,Apparel,SUP-010,508.28,611.58,1.1,326,8
+PRD-029,Women's Summer Dress,Apparel,SUP-010,1999.82,2754.7,32.5,449,27
+PRD-030,Kids' Denim Jeans,Apparel,SUP-010,85.31,99.83,12.4,479,7
+PRD-031,Men's Leather Dress Shoes,Footwear,SUP-011,1244.56,1624.22,23.7,108,25
+PRD-032,Women's Ankle Boots,Footwear,SUP-011,1895.78,2753.19,12.9,238,12
+PRD-033,Unisex Sandals,Footwear,SUP-011,1213.76,2156.16,35.9,448,12
+PRD-034,Queen Platform Bed Frame,Furniture,SUP-012,1929.62,2354.65,1.4,209,25
+PRD-035,Modular Bookshelf,Furniture,SUP-012,1356.31,2404.48,19.9,416,13
+PRD-036,Adjustable Standing Desk,Furniture,SUP-012,156.61,250.4,31.4,102,29
+PRD-037,Multivitamin 90-Count,Health & Beauty,SUP-013,1546.1,2632.53,30.1,111,25
+PRD-038,Hair Growth Oil,Health & Beauty,SUP-013,1566.36,2154.81,21.5,239,9
+PRD-039,Sunscreen SPF50 200ml,Health & Beauty,SUP-013,1014.39,1391.54,42.5,471,22
+PRD-040,Raw Honey Jar 500g,Food & Beverage,SUP-014,215.55,382.5,31.8,474,21
+PRD-041,Protein Shake Powder 2kg,Food & Beverage,SUP-014,1416.08,2029.34,36.7,383,15
+PRD-042,Almond Milk 6-Pack,Food & Beverage,SUP-014,1233.75,2156.29,38.8,288,20
+PRD-043,Folding Treadmill,Sports,SUP-015,1652.34,2536.52,16.2,175,9
+PRD-044,Cycling Helmet,Sports,SUP-015,561.46,810.2,37.5,341,26
+PRD-045,Tennis Racket Pro,Sports,SUP-015,1338.04,1831.32,24.8,216,12
+PRD-046,Arduino Starter Pack,Technology,SUP-016,977.66,1349.79,13.0,193,26
+PRD-047,Smart Doorbell Camera,Technology,SUP-016,1403.86,1866.54,0.6,147,9
+PRD-048,NAS Storage Unit 4-Bay,Technology,SUP-016,486.51,688.01,27.8,173,29
+PRD-049,Smart Home Hub,Electronics,SUP-017,954.81,1539.82,22.5,58,9
+PRD-050,External SSD 1TB,Electronics,SUP-017,592.0,836.41,12.2,389,25
+PRD-051,Tablet 10-inch,Electronics,SUP-017,741.2,1119.03,17.3,431,24
+PRD-052,Men's Polo Shirt,Apparel,SUP-018,664.93,1068.45,13.6,178,14
+PRD-053,Women's Yoga Pants,Apparel,SUP-018,245.71,313.32,6.1,324,29
+PRD-054,Unisex Windbreaker,Apparel,SUP-018,374.37,483.18,24.3,420,25
+PRD-055,Men's Work Boots,Footwear,SUP-019,1953.33,2912.44,14.2,101,13
+PRD-056,Women's Ballet Flats,Footwear,SUP-019,596.01,825.22,15.2,412,24
+PRD-057,Kids' Athletic Shoes,Footwear,SUP-019,257.53,303.78,2.8,199,29
+PRD-058,Bedside Table Set,Furniture,SUP-020,1888.46,2954.71,37.7,102,7
+PRD-059,Coffee Table Glass Top,Furniture,SUP-020,1150.26,1673.75,22.1,144,8
+PRD-060,Wardrobe 3-Door,Furniture,SUP-020,508.69,869.92,5.8,83,19
+PRD-061,Probiotics Supplement,Health & Beauty,SUP-021,986.03,1503.76,34.4,127,11
+PRD-062,Argan Oil Shampoo,Health & Beauty,SUP-021,1623.23,2868.14,4.4,177,10
+PRD-063,Moisturising Body Lotion,Health & Beauty,SUP-021,1118.36,1588.65,29.8,366,14
+PRD-064,Mixed Nuts Bag 1kg,Food & Beverage,SUP-022,1552.51,2169.24,45.4,202,25
+PRD-065,Whole Grain Pasta 5kg,Food & Beverage,SUP-022,1980.11,2670.17,31.1,362,30
+PRD-066,Organic Quinoa 2kg,Food & Beverage,SUP-022,202.97,334.04,31.3,185,28
+PRD-067,Basketball Size 7,Sports,SUP-023,166.97,218.05,27.6,130,7
+PRD-068,Football Training Kit,Sports,SUP-023,819.99,1310.42,23.5,66,14
+PRD-069,Swimming Goggles,Sports,SUP-023,579.77,773.28,43.0,86,28
+PRD-070,UPS Power Backup 1500VA,Technology,SUP-024,470.68,622.22,39.6,351,28
+PRD-071,Industrial IoT Sensor Kit,Technology,SUP-024,1608.79,2056.97,5.8,165,27
+PRD-072,PLC Controller Module,Technology,SUP-024,302.23,399.75,7.2,80,12
+PRD-073,Wireless Charging Pad,Electronics,SUP-025,1586.29,2437.78,41.2,197,21
+PRD-074,LED Monitor 27-inch,Electronics,SUP-025,253.09,404.35,35.0,189,23
+PRD-075,Gaming Mouse,Electronics,SUP-025,1082.26,1552.55,29.9,271,30
+PRD-076,Thermal Base Layer,Apparel,SUP-026,648.03,850.69,4.7,395,25
+PRD-077,Women's Blazer,Apparel,SUP-026,1176.31,1368.62,38.3,470,15
+PRD-078,Men's Cargo Shorts,Apparel,SUP-026,1154.61,1900.51,8.8,315,27
+PRD-079,Men's Loafers,Footwear,SUP-027,887.25,1180.75,49.8,273,27
+PRD-080,Women's High-Top Trainers,Footwear,SUP-027,1629.42,2900.18,23.6,259,17
+PRD-081,Hiking Boots,Footwear,SUP-027,645.51,786.22,8.1,260,29
+PRD-082,Filing Cabinet 4-Drawer,Furniture,SUP-028,993.46,1570.34,20.1,439,24
+PRD-083,Outdoor Garden Chair,Furniture,SUP-028,78.21,94.42,12.7,109,19
+PRD-084,Bar Stool Set of 2,Furniture,SUP-028,1730.5,2917.97,0.2,495,24
+PRD-085,Nail Care Set,Health & Beauty,SUP-029,926.64,1098.28,26.0,368,22
+PRD-086,Eye Cream 15ml,Health & Beauty,SUP-029,1252.69,2059.41,10.3,331,11
+PRD-087,Detox Charcoal Mask,Health & Beauty,SUP-029,1855.71,2662.53,34.9,112,7
+PRD-088,Sparkling Water 24-Pack,Food & Beverage,SUP-030,1946.43,3008.73,12.0,131,16
+PRD-089,Energy Bars Box of 12,Food & Beverage,SUP-030,1103.92,1665.77,4.8,480,10
+PRD-090,Instant Oats 1kg,Food & Beverage,SUP-030,925.59,1135.1,41.6,305,29
+PRD-091,Jump Rope Speed,Sports,SUP-031,587.26,944.62,20.8,297,22
+PRD-092,Foam Roller 60cm,Sports,SUP-031,491.24,740.95,19.2,356,23
+PRD-093,Weight Bench Flat,Sports,SUP-031,1493.85,1850.48,3.6,445,20
+PRD-094,RFID Reader Kit,Technology,SUP-032,683.05,1135.24,13.4,51,16
+PRD-095,Single-Board Computer Kit,Technology,SUP-032,1453.47,2462.7,29.0,387,22
+PRD-096,Thermal Label Printer,Technology,SUP-032,1731.19,2493.36,24.3,220,24
+PRD-097,Mechanical Keyboard,Electronics,SUP-033,1526.93,2130.35,46.6,495,13
+PRD-098,Smart Thermostat,Electronics,SUP-033,1961.65,2560.39,19.2,488,20
+PRD-099,Security Camera,Electronics,SUP-033,92.08,150.46,35.3,465,19
+PRD-100,Kids' School Uniform Set,Apparel,SUP-034,775.23,1225.95,41.1,127,22
+PRD-101,Women's Trench Coat,Apparel,SUP-034,1929.82,2377.65,48.3,219,10
+PRD-102,Men's Puffer Vest,Apparel,SUP-034,1749.01,2511.93,26.3,283,7
+PRD-103,Waterproof Rain Boots,Footwear,SUP-035,1446.28,2048.64,32.8,129,9
+PRD-104,Men's Flip Flops,Footwear,SUP-035,941.63,1676.08,17.0,404,19
+PRD-105,Women's Wedge Sandals,Footwear,SUP-035,1301.42,2217.16,42.6,489,24
+PRD-106,TV Entertainment Unit,Furniture,SUP-036,763.12,1034.66,36.0,438,22
+PRD-107,Corner Desk,Furniture,SUP-036,1745.4,2047.94,3.5,373,28
+PRD-108,Kids' Bunk Bed,Furniture,SUP-036,1842.25,3312.97,37.4,272,10
+PRD-109,Whitening Toothpaste,Health & Beauty,SUP-037,1521.94,2446.56,5.1,135,29
+PRD-110,Anti-Aging Night Cream,Health & Beauty,SUP-037,602.43,704.13,16.3,78,16
+PRD-111,Hydrating Lip Balm Pack,Health & Beauty,SUP-037,720.13,1029.75,12.3,260,25
+PRD-112,Matcha Powder 250g,Food & Beverage,SUP-038,1365.19,1729.75,8.8,362,19
+PRD-113,Turmeric Supplement,Food & Beverage,SUP-038,1241.32,1621.83,45.7,123,14
+PRD-114,Apple Cider Vinegar 1L,Food & Beverage,SUP-038,924.99,1216.44,12.8,54,21
+PRD-115,Badminton Racket Set,Sports,SUP-039,1802.91,2867.43,8.0,276,18
+PRD-116,Gym Gloves Pair,Sports,SUP-039,1975.37,2655.79,48.1,403,15
+PRD-117,Pull-Up Bar Doorframe,Sports,SUP-039,916.39,1233.81,50.0,486,22
+PRD-118,Barcode Scanner Wireless,Technology,SUP-040,217.77,304.42,18.0,201,29
+PRD-119,VoIP Desk Phone,Technology,SUP-040,593.99,1060.67,32.9,190,7
+PRD-120,Managed PoE Switch,Technology,SUP-040,1134.03,1809.65,37.3,75,26
+PRD-121,14-inch Laptop Pro,Electronics,SUP-041,1491.62,2522.84,45.2,447,14
+PRD-122,Wireless Noise-Cancelling Headphones,Electronics,SUP-041,1216.09,1677.0,31.9,367,15
+PRD-123,4K Smart TV 55-inch,Electronics,SUP-041,1357.14,2196.67,33.0,479,11
+PRD-124,Men's Slim-Fit Chinos,Apparel,SUP-042,1258.35,2186.02,32.4,208,21
+PRD-125,Women's Quilted Jacket,Apparel,SUP-042,71.56,99.27,6.7,201,17
+PRD-126,Unisex Hoodie,Apparel,SUP-042,1496.22,1891.47,6.7,326,18
+PRD-127,Men's Trail Running Shoes,Footwear,SUP-043,1064.05,1855.45,41.5,181,22
+PRD-128,Women's Slip-On Sneakers,Footwear,SUP-043,1934.93,2596.37,43.5,461,10
+PRD-129,Kids' School Shoes,Footwear,SUP-043,939.32,1126.19,37.7,165,28
+PRD-130,Ergonomic Office Chair,Furniture,SUP-044,1449.81,2590.76,48.4,461,24
+PRD-131,Solid Wood Dining Table,Furniture,SUP-044,734.72,1222.53,0.8,324,10
+PRD-132,3-Seat Fabric Sofa,Furniture,SUP-044,912.3,1448.13,33.6,349,19
+PRD-133,Vitamin C Serum 30ml,Health & Beauty,SUP-045,1645.72,2898.43,5.5,169,22
+PRD-134,Collagen Face Cream,Health & Beauty,SUP-045,54.92,94.72,28.1,362,14
+PRD-135,Electric Toothbrush Kit,Health & Beauty,SUP-045,1297.07,2027.34,23.3,408,16
+PRD-136,Organic Green Tea 100-Pack,Food & Beverage,SUP-046,1300.23,1593.87,2.4,69,16
+PRD-137,Dark Roast Coffee Beans 1kg,Food & Beverage,SUP-046,1991.88,2441.01,11.8,325,11
+PRD-138,Extra Virgin Olive Oil 500ml,Food & Beverage,SUP-046,780.35,1085.59,47.5,406,24
+PRD-139,Adjustable Dumbbell Set,Sports,SUP-047,841.16,1373.17,7.8,262,27
+PRD-140,Yoga Mat Premium,Sports,SUP-047,202.55,297.36,20.5,193,8
+PRD-141,Resistance Bands Kit,Sports,SUP-047,1382.11,1784.62,22.3,170,18
+PRD-142,Wi-Fi 6 Router,Technology,SUP-048,203.21,324.26,27.3,380,18
+PRD-143,Network Switch 24-Port,Technology,SUP-048,125.8,167.23,48.4,484,21
+PRD-144,Raspberry Pi 4 Kit,Technology,SUP-048,187.89,241.98,32.0,60,8
+PRD-145,Portable Bluetooth Speaker,Electronics,SUP-049,1574.66,2060.16,6.4,339,13
+PRD-146,USB-C Docking Station,Electronics,SUP-049,141.88,233.73,10.4,160,14
+PRD-147,Digital Camera Kit,Electronics,SUP-049,660.48,822.9,45.0,51,15
+PRD-148,Men's Formal Shirt,Apparel,SUP-050,1717.52,2136.68,6.6,178,12
+PRD-149,Women's Summer Dress,Apparel,SUP-050,224.3,384.27,6.7,233,14
+PRD-150,Kids' Denim Jeans,Apparel,SUP-050,1179.76,1368.83,13.3,114,30

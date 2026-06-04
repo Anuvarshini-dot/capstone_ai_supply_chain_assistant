@@ -1,0 +1,51 @@
+supplier_id,supplier_name,category,country,region,on_time_delivery_rate,defect_rate,avg_lead_time_days,contract_value_usd,payment_terms,risk_tier,reliability_score,active
+SUP-001,Apex Supply Co.,Electronics,Nigeria,Africa,0.74,0.0682,26,4249220,Net30,medium,0.798,True
+SUP-002,Meridian Logistics Ltd.,Apparel,Ghana,Africa,0.82,0.0648,27,4308584,Net90,medium,0.855,True
+SUP-003,Summit Industries Inc.,Footwear,Italy,Europe,0.87,0.0229,5,2769218,Net60,low,0.902,True
+SUP-004,Pinnacle Global Traders,Furniture,United States,USCA,0.86,0.0109,5,2058671,Net30,low,0.899,True
+SUP-005,Horizon Manufacturing Group,Health & Beauty,Italy,Europe,0.96,0.0284,6,4126783,Net30,low,0.963,True
+SUP-006,Pacific Exports Ltd.,Food & Beverage,Peru,LATAM,0.59,0.0803,17,4662086,Net30,high,0.689,True
+SUP-007,Atlantic Commerce Corp.,Sports,Canada,USCA,0.75,0.0543,4,4573943,Net90,medium,0.809,True
+SUP-008,Global Solutions LLC,Technology,Mexico,USCA,0.88,0.0094,5,3725049,Net90,low,0.913,True
+SUP-009,Premier Partners Ltd.,Electronics,Poland,Europe,0.68,0.039,10,226448,Net90,medium,0.764,True
+SUP-010,Nova Trading Co.,Apparel,Mexico,USCA,0.88,0.0066,3,543868,Net30,low,0.914,True
+SUP-011,Sterling Supply Co.,Footwear,Brazil,LATAM,0.82,0.0644,11,4363054,Net30,medium,0.855,True
+SUP-012,Vanguard Logistics Ltd.,Furniture,Spain,Europe,0.78,0.0386,7,4840256,Net90,medium,0.834,True
+SUP-013,Zenith Industries Inc.,Health & Beauty,Singapore,Pacific Asia,0.88,0.0142,20,1647274,Net30,low,0.912,True
+SUP-014,Crown Global Traders,Food & Beverage,Brazil,LATAM,0.94,0.0106,16,3967686,Net90,low,0.955,True
+SUP-015,Eagle Manufacturing Group,Sports,Germany,Europe,0.57,0.1487,6,558455,Net60,high,0.654,True
+SUP-016,Titan Exports Ltd.,Technology,Kenya,Africa,0.6,0.0787,24,1645587,Net90,high,0.696,True
+SUP-017,Atlas Commerce Corp.,Electronics,Egypt,Africa,0.87,0.0055,32,2145528,Net30,low,0.907,True
+SUP-018,Nexus Solutions LLC,Apparel,Poland,Europe,0.81,0.0642,6,474365,Net90,medium,0.848,True
+SUP-019,Vector Partners Ltd.,Footwear,Peru,LATAM,0.81,0.0688,13,1445118,Net60,medium,0.846,False
+SUP-020,Quantum Trading Co.,Furniture,Singapore,Pacific Asia,0.91,0.0259,28,541869,Net30,low,0.929,True
+SUP-021,Cobalt Supply Co.,Health & Beauty,Australia,Pacific Asia,0.4,0.1012,28,3866886,Net60,high,0.55,False
+SUP-022,Vertex Logistics Ltd.,Food & Beverage,Chile,LATAM,0.94,0.0219,18,4132495,Net30,low,0.951,True
+SUP-023,Alpha Industries Inc.,Sports,India,Pacific Asia,0.71,0.0687,23,4598263,Net30,medium,0.776,True
+SUP-024,Beta Global Traders,Technology,Indonesia,Pacific Asia,0.41,0.1167,22,4505408,Net30,high,0.552,True
+SUP-025,Delta Manufacturing Group,Electronics,Brazil,LATAM,0.64,0.0764,12,624798,Net90,high,0.725,True
+SUP-026,Sigma Exports Ltd.,Apparel,South Africa,Africa,0.78,0.0394,21,4828783,Net30,medium,0.834,True
+SUP-027,Omega Commerce Corp.,Footwear,Germany,Europe,0.77,0.0468,10,2237461,Net30,medium,0.825,False
+SUP-028,Metro Solutions LLC,Furniture,Colombia,LATAM,0.7,0.0458,20,2566557,Net60,medium,0.776,True
+SUP-029,Urban Partners Ltd.,Health & Beauty,Colombia,LATAM,0.83,0.0674,10,3894377,Net90,medium,0.861,True
+SUP-030,Coast Trading Co.,Food & Beverage,Japan,Pacific Asia,0.42,0.0871,18,1161126,Net60,high,0.568,True
+SUP-031,Northern Supply Co.,Sports,United States,USCA,0.62,0.0996,4,3725758,Net90,high,0.704,True
+SUP-032,Southern Logistics Ltd.,Technology,Kenya,Africa,0.77,0.0695,34,115624,Net90,medium,0.818,True
+SUP-033,Eastern Industries Inc.,Electronics,Mexico,USCA,0.71,0.0565,4,2268500,Net30,medium,0.78,True
+SUP-034,Western Global Traders,Apparel,South Africa,Africa,0.59,0.0824,27,1816889,Net90,high,0.688,True
+SUP-035,Central Manufacturing Group,Footwear,Kenya,Africa,0.88,0.019,26,4289678,Net60,low,0.91,True
+SUP-036,Capital Exports Ltd.,Furniture,Kenya,Africa,0.63,0.1377,20,3603211,Net60,high,0.7,True
+SUP-037,Prime Commerce Corp.,Health & Beauty,Germany,Europe,0.4,0.1317,9,1405447,Net90,high,0.54,True
+SUP-038,Elite Solutions LLC,Food & Beverage,Canada,USCA,0.92,0.0128,3,988466,Net30,low,0.94,True
+SUP-039,Core Partners Ltd.,Sports,Mexico,USCA,0.82,0.0518,5,4936444,Net90,medium,0.858,True
+SUP-040,Flex Trading Co.,Technology,United Kingdom,Europe,0.51,0.0733,10,384662,Net60,high,0.635,True
+SUP-041,Apex Supply Co.,Electronics,India,Pacific Asia,0.94,0.02,19,4746643,Net60,low,0.952,True
+SUP-042,Meridian Logistics Ltd.,Apparel,Peru,LATAM,0.79,0.067,13,1413163,Net30,medium,0.833,True
+SUP-043,Summit Industries Inc.,Footwear,Australia,Pacific Asia,0.85,0.0221,19,3503700,Net90,low,0.888,True
+SUP-044,Pinnacle Global Traders,Furniture,Nigeria,Africa,0.88,0.0236,21,3258992,Net30,low,0.909,True
+SUP-045,Horizon Manufacturing Group,Health & Beauty,Poland,Europe,0.88,0.0245,12,2983147,Net60,low,0.909,True
+SUP-046,Pacific Exports Ltd.,Food & Beverage,India,Pacific Asia,0.88,0.0198,20,2803660,Net60,low,0.91,False
+SUP-047,Atlantic Commerce Corp.,Sports,United States,USCA,0.98,0.0084,7,3402745,Net90,low,0.983,True
+SUP-048,Global Solutions LLC,Technology,Peru,LATAM,0.89,0.0008,14,1547935,Net90,low,0.923,False
+SUP-049,Premier Partners Ltd.,Electronics,Canada,USCA,0.85,0.0179,5,2681316,Net60,low,0.89,True
+SUP-050,Nova Trading Co.,Apparel,Japan,Pacific Asia,0.5,0.1161,18,422341,Net90,high,0.615,True
