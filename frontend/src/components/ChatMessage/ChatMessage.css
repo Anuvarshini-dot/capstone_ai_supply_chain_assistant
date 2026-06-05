@@ -367,6 +367,28 @@
 
 .meta-dot { color: var(--border); }
 
+.sql-meta { margin-top: 8px; }
+
+/* ── SQL query disclosure inside agent card ──────────────────────── */
+.sql-query-details { margin-top: 8px; }
+.sql-query-summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.sql-query-code {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #c4b5fd;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: monospace;
+}
+
 /* ── Collapsible sections ────────────────────────────────────────── */
 .chat-sections {
   display: flex;
@@ -400,6 +422,10 @@
 .section-toggle.open  { color: var(--accent); background: rgba(79,142,247,0.06); }
 
 .chevron { font-size: 11px; color: var(--text-muted); }
+
+.incidents-nav-btn { border-radius: 6px; }
+.incidents-nav-btn:hover { background: rgba(79,142,247,0.08); color: var(--accent); }
+.incidents-nav-arrow { font-size: 12px; color: var(--accent); font-weight: 600; white-space: nowrap; }
 
 .section-body {
   padding: 12px;

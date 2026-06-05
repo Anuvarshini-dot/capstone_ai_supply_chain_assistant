@@ -16,6 +16,7 @@ class SupplyChainState(TypedDict):
     # ── Agent outputs ─────────────────────────────────────────────
     agent_findings:      dict        # keyed by agent name
     sql_result:          Optional[str]
+    sql_entities:        Optional[dict]  # entities extracted from SQL result for targeted ChromaDB retrieval
 
     # ── Final outputs ─────────────────────────────────────────────
     answer:              str
@@ -23,3 +24,4 @@ class SupplyChainState(TypedDict):
     anomaly_correlations: List[dict]
     confidence_score:    float
     evaluation:          dict
+    execution_log:       List[dict]

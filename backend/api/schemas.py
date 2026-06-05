@@ -27,6 +27,8 @@ class QueryResponse(BaseModel):
     confidence_score: float
     routed_agents: List[str] = []
     evaluation: dict = {}
+    execution_log: List[dict] = []
+    sql_entities: Optional[dict] = None
 
 
 class SimilarIncidentRequest(BaseModel):

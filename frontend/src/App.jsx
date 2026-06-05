@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import Incidents from './pages/Incidents';
 import Dashboard from './pages/Dashboard';
 import Evaluation from './pages/Evaluation';
+import Logs from './pages/Logs';
 import { AppProvider } from './context/AppContext';
 import './App.css';
 
@@ -28,6 +29,9 @@ function Navbar() {
         <NavLink to="/evaluation" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
           Evaluation
         </NavLink>
+        <NavLink to="/logs" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+          Logs
+        </NavLink>
       </div>
       <div className="navbar__status">
         <span className="status-dot" />
@@ -50,6 +54,7 @@ export default function App() {
                 <Route path="/incidents" element={<Incidents />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/evaluation" element={<Evaluation />} />
+                <Route path="/logs" element={<Logs />} />
               </Routes>
             </div>
           </main>

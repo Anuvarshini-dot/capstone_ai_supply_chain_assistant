@@ -28,11 +28,13 @@ async def query_endpoint(request: QueryRequest):
         "retrieved_incidents": [],
         "agent_findings":      {},
         "sql_result":          None,
+        "sql_entities":        None,
         "answer":              "",
         "recommendations":     [],
         "anomaly_correlations": [],
         "confidence_score":    0.0,
         "evaluation":          {},
+        "execution_log":       [],
     }
 
     try:

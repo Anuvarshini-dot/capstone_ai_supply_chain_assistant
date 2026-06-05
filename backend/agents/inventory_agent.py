@@ -21,12 +21,14 @@ If the query asks about NEGATIVE performance (worst, lowest, failing, canceled, 
 
 Base findings on: product fulfillment rate, order status (COMPLETE vs PENDING vs CANCELED), and cancellation patterns by product or region.
 
+Use ONLY product names from the provided orders data — never invent or use placeholder names.
+
 Return ONLY a valid JSON object:
 {
   "summary": "2-3 sentence answer addressing the query with risk context",
-  "top_fulfillment": ["Product A", "Product B"],
-  "low_fulfillment": ["Product C", "Product D"],
-  "at_risk_products": ["Product C", "Product D"],
+  "top_fulfillment": ["<actual product name from data>"],
+  "low_fulfillment": ["<actual product name from data>"],
+  "at_risk_products": ["<actual product name from data>"],
   "risk_level": "low|medium|high",
   "findings": ["finding 1", "finding 2", "finding 3"],
   "avg_fulfillment_rate": 0.85,

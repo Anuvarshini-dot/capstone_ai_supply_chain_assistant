@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
-import IncidentTable from '../IncidentTable/IncidentTable'
 import RecommendationCard from '../RecommendationCard/RecommendationCard'
 import './ChatMessage.css'
 
@@ -8,6 +8,7 @@ const AGENT_CONFIG = {
   supplier:  { label: 'Supplier Risk Agent', icon: '🏭', accent: '#4f8ef7' },
   shipment:  { label: 'Shipment Agent',      icon: '🚢', accent: '#f59e0b' },
   inventory: { label: 'Inventory Agent',     icon: '📦', accent: '#22c55e' },
+  nlsql:     { label: 'NL→SQL Agent',        icon: '🗃️', accent: '#a78bfa' },
 }
 
 const RISK_COLOR = { high: '#ef4444', medium: '#f59e0b', low: '#22c55e' }
@@ -37,6 +38,13 @@ function AgentCard({ agentKey, data }) {
         <ul className="agent-card-inline__findings">
           {data.findings.map((f, i) => <li key={i}>{f}</li>)}
         </ul>
+      )}
+
+      {data.sql_query && (
+        <details className="sql-query-details">
+          <summary className="sql-query-summary">SQL executed</summary>
+          <pre className="sql-query-code">{data.sql_query}</pre>
+        </details>
       )}
 
       <div className="agent-card-inline__tags-row">
@@ -90,6 +98,7 @@ function AgentCard({ agentKey, data }) {
 export default function ChatMessage({ message }) {
   const [openSection, setOpenSection] = useState(null)
   const toggle = (s) => setOpenSection(p => p === s ? null : s)
+  const navigate = useNavigate()
 
   if (message.role === 'user') {
     return (
@@ -118,8 +127,8 @@ export default function ChatMessage({ message }) {
       <div className="chat-content">
         {isSpecialist ? (
           <>
-            {/* Individual agent output cards — hidden for SQL queries */}
-            {!routed_agents?.includes('nlsql') && (
+            {/* Agent output cards — shown for all paths including NL→SQL */}
+            {agentKeys.length > 0 && (
               <div className="agent-outputs-section">
                 <div className="section-eyebrow">Agent Analysis</div>
                 <div className="agent-outputs-grid">
@@ -143,11 +152,20 @@ export default function ChatMessage({ message }) {
               </div>
             )}
 
-            {/* SQL path — markdown-rendered answer bubble */}
+            {/* SQL path — markdown-rendered answer bubble with confidence */}
             {routed_agents?.includes('nlsql') ? (
-              <div className="chat-bubble chat-bubble--ai sql-answer">
-                <ReactMarkdown>{answer}</ReactMarkdown>
-              </div>
+              <>
+                <div className="chat-bubble chat-bubble--ai sql-answer">
+                  <ReactMarkdown>{answer}</ReactMarkdown>
+                </div>
+                {confidence_score != null && (
+                  <div className="summary-block__meta sql-meta">
+                    <span>Confidence <strong>{(confidence_score * 100).toFixed(0)}%</strong></span>
+                    <span className="meta-dot">·</span>
+                    <span>NL→SQL</span>
+                  </div>
+                )}
+              </>
             ) : (
               /* Specialist path — executive summary block */
               <div className="summary-block">
@@ -183,19 +201,22 @@ export default function ChatMessage({ message }) {
                 const shipments = retrieved_incidents.filter(
                   inc => !inc.metadata?.doc_type || inc.metadata?.doc_type === 'shipment'
                 )
-                return shipments.length > 0 ? (
+                const profileCount = retrieved_incidents.length - shipments.length
+                if (shipments.length === 0) return null
+                return (
                   <div className="chat-section">
-                    <button className={`section-toggle ${openSection === 'incidents' ? 'open' : ''}`} onClick={() => toggle('incidents')}>
-                      <span>📋 Retrieved Shipments ({shipments.length})</span>
-                      <span className="chevron">{openSection === 'incidents' ? '▲' : '▼'}</span>
+                    <button
+                      className="section-toggle incidents-nav-btn"
+                      onClick={() => navigate('/incidents')}
+                    >
+                      <span>
+                        📋 {shipments.length} shipment{shipments.length > 1 ? 's' : ''} retrieved
+                        {profileCount > 0 && ` · ${profileCount} profile doc${profileCount > 1 ? 's' : ''} used by agents`}
+                      </span>
+                      <span className="incidents-nav-arrow">View in Incidents →</span>
                     </button>
-                    {openSection === 'incidents' && (
-                      <div className="section-body">
-                        <IncidentTable incidents={shipments} title="" />
-                      </div>
-                    )}
                   </div>
-                ) : null
+                )
               })()}
             </div>
           </>
