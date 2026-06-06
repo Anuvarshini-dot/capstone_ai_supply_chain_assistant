@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
 import RecommendationCard from '../RecommendationCard/RecommendationCard'
 import './ChatMessage.css'
 
@@ -117,8 +116,8 @@ export default function ChatMessage({ message }) {
   }
 
   const { answer, retrieved_incidents, recommendations, agent_findings, anomaly_correlations, confidence_score, routed_agents } = message.content
-  const agentKeys = Object.keys(agent_findings || {})
-  const isSpecialist = agentKeys.length > 0
+  const agentKeys = Object.keys(agent_findings || {}).filter(k => k !== 'nlsql')
+  const isSpecialist = Object.keys(agent_findings || {}).length > 0
 
   return (
     <div className="chat-msg chat-msg--ai">
@@ -127,7 +126,6 @@ export default function ChatMessage({ message }) {
       <div className="chat-content">
         {isSpecialist ? (
           <>
-            {/* Agent output cards — shown for all paths including NL→SQL */}
             {agentKeys.length > 0 && (
               <div className="agent-outputs-section">
                 <div className="section-eyebrow">Agent Analysis</div>
@@ -139,8 +137,7 @@ export default function ChatMessage({ message }) {
               </div>
             )}
 
-            {/* Anomaly correlations — inline warning strip (specialist path only) */}
-            {!routed_agents?.includes('nlsql') && anomaly_correlations?.length > 0 && (
+            {anomaly_correlations?.length > 0 && (
               <div className="anomaly-strip">
                 <div className="anomaly-strip__title">Correlated Anomalies</div>
                 {anomaly_correlations.map((a, i) => (
@@ -152,34 +149,17 @@ export default function ChatMessage({ message }) {
               </div>
             )}
 
-            {/* SQL path — markdown-rendered answer bubble with confidence */}
-            {routed_agents?.includes('nlsql') ? (
-              <>
-                <div className="chat-bubble chat-bubble--ai sql-answer">
-                  <ReactMarkdown>{answer}</ReactMarkdown>
-                </div>
-                {confidence_score != null && (
-                  <div className="summary-block__meta sql-meta">
-                    <span>Confidence <strong>{(confidence_score * 100).toFixed(0)}%</strong></span>
-                    <span className="meta-dot">·</span>
-                    <span>NL→SQL</span>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* Specialist path — executive summary block */
-              <div className="summary-block">
-                <div className="summary-block__label">
-                  <span className="summary-block__icon">✦</span> Executive Summary
-                </div>
-                <p className="summary-block__text">{answer}</p>
-                <div className="summary-block__meta">
-                  <span>Confidence <strong>{(confidence_score * 100).toFixed(0)}%</strong></span>
-                  <span className="meta-dot">·</span>
-                  <span>{retrieved_incidents?.length ?? 0} incidents analysed</span>
-                </div>
+            <div className="summary-block">
+              <div className="summary-block__label">
+                <span className="summary-block__icon">✦</span> Executive Summary
               </div>
-            )}
+              <p className="summary-block__text">{answer}</p>
+              <div className="summary-block__meta">
+                <span>Confidence <strong>{(confidence_score * 100).toFixed(0)}%</strong></span>
+                <span className="meta-dot">·</span>
+                <span>{retrieved_incidents?.length ?? 0} incidents analysed</span>
+              </div>
+            </div>
 
             {/* Collapsible sections */}
             <div className="chat-sections">
@@ -201,19 +181,59 @@ export default function ChatMessage({ message }) {
                 const shipments = retrieved_incidents.filter(
                   inc => !inc.metadata?.doc_type || inc.metadata?.doc_type === 'shipment'
                 )
-                const profileCount = retrieved_incidents.length - shipments.length
-                if (shipments.length === 0) return null
+                const supplierDocs = retrieved_incidents.filter(
+                  inc => inc.metadata?.doc_type === 'supplier_profile'
+                )
+                const warehouseDocs = retrieved_incidents.filter(
+                  inc => inc.metadata?.doc_type === 'warehouse_profile'
+                )
+
+                // Unique supplier names from agent findings + retrieved supplier profile docs
+                const supplierNames = [
+                  ...(agent_findings?.supplier?.low_performers || []),
+                  ...(agent_findings?.supplier?.top_performers || []),
+                  ...(agent_findings?.nlsql?.low_performers    || []),
+                  ...(agent_findings?.nlsql?.top_performers    || []),
+                  ...supplierDocs.map(d => d.metadata?.supplier_name).filter(Boolean),
+                ].filter((n, i, arr) => n && arr.indexOf(n) === i)
+
+                // Unique warehouse names from retrieved warehouse profile docs
+                const warehouseNames = warehouseDocs
+                  .map(d => d.metadata?.warehouse_name)
+                  .filter((n, i, arr) => n && arr.indexOf(n) === i)
+
+                const isSupplierQuery = routed_agents?.includes('supplier') || supplierNames.length > 0
+                const isWarehouseQuery = routed_agents?.includes('inventory') || warehouseDocs.length > 0
+                const isShipmentQuery = routed_agents?.includes('shipment') || shipments.length > 0
+
+                let navTab, navLabel, navExtra = {}
+                if (isSupplierQuery) {
+                  navTab   = 'suppliers'
+                  navLabel = 'View Supplier Profiles'
+                  navExtra = { filterNames: supplierNames.slice(0, 5) }
+                } else if (isWarehouseQuery) {
+                  navTab   = 'warehouses'
+                  navLabel = 'View Warehouse Profiles'
+                  navExtra = { warehouseNames: warehouseNames.slice(0, 5) }
+                } else if (isShipmentQuery) {
+                  navTab   = 'shipments'
+                  navLabel = 'View Shipment Incidents'
+                } else {
+                  return null
+                }
+
+                const incidentCount = shipments.length || retrieved_incidents.length
+
                 return (
                   <div className="chat-section">
                     <button
                       className="section-toggle incidents-nav-btn"
-                      onClick={() => navigate('/incidents')}
+                      onClick={() => navigate('/incidents', { state: { tab: navTab, ...navExtra } })}
                     >
                       <span>
-                        📋 {shipments.length} shipment{shipments.length > 1 ? 's' : ''} retrieved
-                        {profileCount > 0 && ` · ${profileCount} profile doc${profileCount > 1 ? 's' : ''} used by agents`}
+                        📋 {incidentCount} incident{incidentCount > 1 ? 's' : ''} retrieved
                       </span>
-                      <span className="incidents-nav-arrow">View in Incidents →</span>
+                      <span className="incidents-nav-arrow">{navLabel} →</span>
                     </button>
                   </div>
                 )

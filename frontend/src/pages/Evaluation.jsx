@@ -3,11 +3,13 @@ import { useAppContext } from '../context/AppContext'
 import './Evaluation.css'
 
 const METRIC_META = {
-  retrieval_quality:    { label: 'Retrieval Quality',  icon: '🔍', desc: 'Average hybrid score of retrieved documents (semantic + BM25).' },
-  answer_relevancy:     { label: 'Answer Relevancy',   icon: '🎯', desc: 'How well the answer addresses the user query.' },
-  faithfulness:         { label: 'Faithfulness',        icon: '📌', desc: 'How faithfully the answer is grounded in the retrieved context.' },
-  deepeval_unavailable: { label: 'DeepEval',            icon: '⚠',  desc: null },
-  deepeval_error:       { label: 'DeepEval Error',      icon: '⚠',  desc: null },
+  retrieval_quality:     { label: 'Retrieval Quality',    icon: '🔍', desc: 'Avg hybrid score (semantic + BM25) of retrieved docs, plus how many score above the quality threshold.' },
+  context_coverage:      { label: 'Context Coverage',     icon: '🗂️', desc: 'How many distinct entity types (shipment, supplier, warehouse) appear in the retrieved context — broader coverage means richer grounding.' },
+  answer_relevancy:      { label: 'Answer Relevancy',     icon: '🎯', desc: 'Query ↔ Answer: is the answer relevant to both the question and the supply chain risk assessment purpose? Risk context (stockouts, delays, supplier tiers) is expected and not penalised.' },
+  faithfulness:          { label: 'Faithfulness',          icon: '📌', desc: 'Context ↔ Answer: is every claim in the answer supported by the retrieved context? Low score signals hallucination risk.' },
+  contextual_relevancy:  { label: 'Contextual Relevancy', icon: '🔗', desc: 'Query ↔ Context: were the right documents retrieved for this query? Low score means retrieval surfaced irrelevant records.' },
+  deepeval_unavailable:  { label: 'DeepEval',             icon: '⚠',  desc: null },
+  deepeval_error:        { label: 'DeepEval Error',        icon: '⚠',  desc: null },
 }
 
 function ScoreBar({ score, threshold }) {
@@ -57,7 +59,7 @@ function MetricCard({ metricKey, data }) {
         <div className="eval-card__details">
           {Object.entries(data.details).map(([k, v]) => (
             <span key={k} className="eval-detail-chip">
-              {k.replace(/_/g, ' ')}: <strong>{typeof v === 'number' ? v.toFixed(3) : v}</strong>
+              {k.replace(/_/g, ' ')}: <strong>{typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(3)) : v}</strong>
             </span>
           ))}
         </div>
@@ -130,9 +132,14 @@ export default function Evaluation() {
       )}
 
       <div className="eval-note">
-        <strong>Answer Relevancy</strong> and <strong>Faithfulness</strong> are computed by DeepEval using an LLM judge.
-        <strong> Retrieval Quality</strong> is computed directly from the hybrid search scores — no LLM required.
-        Metrics update automatically after each new query.
+        <strong>Answer Relevancy</strong> uses a domain-aware GEval judge that understands risk
+        context (stockouts, delays, supplier tiers) is expected output, not noise.{' '}
+        <strong>Faithfulness</strong> and <strong>Contextual Relevancy</strong> use standard
+        DeepEval LLM judges covering the remaining RAG triangle edges (context↔answer,
+        query↔context).{' '}
+        <strong>Retrieval Quality</strong> and <strong>Context Coverage</strong> are computed
+        directly from document scores and metadata — no LLM required.
+        All metrics update automatically after each new query.
       </div>
     </div>
   )

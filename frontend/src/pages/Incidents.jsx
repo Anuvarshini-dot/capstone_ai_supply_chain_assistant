@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import IncidentTable from '../components/IncidentTable/IncidentTable'
 import { useIncidents } from '../hooks/useSupplyChain'
 import { useAppContext } from '../context/AppContext'
@@ -21,7 +22,7 @@ function sel(key, state, setState) {
 }
 
 // ── Supplier Profiles Tab ─────────────────────────────────────────────────────
-function SupplierProfilesTab({ onDrilldown }) {
+function SupplierProfilesTab({ onDrilldown, filterNames = [] }) {
   const { loading, error, data, load } = useIncidents()
   const [f, setF] = useState({ risk_tier: '', supplier_region: '', supplier_category: '' })
 
@@ -37,9 +38,21 @@ function SupplierProfilesTab({ onDrilldown }) {
   }
 
   const profiles = data?.incidents || []
+  const displayProfiles = filterNames.length > 0
+    ? profiles.filter(p => filterNames.some(n =>
+        p.metadata?.supplier_name?.toLowerCase() === n.toLowerCase()
+      ))
+    : profiles
 
   return (
     <div className="sub-tab-content">
+      {filterNames.length > 0 && (
+        <div className="drilldown-banner">
+          <span>
+            🔍 Showing profiles for: <strong>{filterNames.join(', ')}</strong>
+          </span>
+        </div>
+      )}
       <div className="incidents-filters">
         <div className="filter-grid">
           <div className="filter-field">
@@ -71,10 +84,16 @@ function SupplierProfilesTab({ onDrilldown }) {
 
       {error && <div className="error-banner">Error: {error}</div>}
 
-      {!loading && <div className="profile-count">{profiles.length} supplier profiles</div>}
+      {!loading && (
+        <div className="profile-count">
+          {filterNames.length > 0
+            ? `${displayProfiles.length} of ${profiles.length} supplier profiles`
+            : `${profiles.length} supplier profiles`}
+        </div>
+      )}
 
       <div className="profile-grid">
-        {profiles.map(p => {
+        {displayProfiles.map(p => {
           const m = p.metadata || {}
           const rc = RISK_COLOR[m.risk_tier] || '#94a3b8'
           return (
@@ -130,7 +149,7 @@ function SupplierProfilesTab({ onDrilldown }) {
 }
 
 // ── Warehouse Profiles Tab ────────────────────────────────────────────────────
-function WarehouseProfilesTab({ onDrilldown }) {
+function WarehouseProfilesTab({ onDrilldown, filterNames = [] }) {
   const { loading, error, data, load } = useIncidents()
   const [region, setRegion] = useState('')
 
@@ -146,9 +165,21 @@ function WarehouseProfilesTab({ onDrilldown }) {
   }
 
   const profiles = data?.incidents || []
+  const displayProfiles = filterNames.length > 0
+    ? profiles.filter(p => filterNames.some(n =>
+        p.metadata?.warehouse_name?.toLowerCase() === n.toLowerCase()
+      ))
+    : profiles
 
   return (
     <div className="sub-tab-content">
+      {filterNames.length > 0 && (
+        <div className="drilldown-banner">
+          <span>
+            🔍 Showing profiles for: <strong>{filterNames.join(', ')}</strong>
+          </span>
+        </div>
+      )}
       <div className="incidents-filters">
         <div className="filter-grid">
           <div className="filter-field">
@@ -168,10 +199,16 @@ function WarehouseProfilesTab({ onDrilldown }) {
 
       {error && <div className="error-banner">Error: {error}</div>}
 
-      {!loading && <div className="profile-count">{profiles.length} warehouse profiles</div>}
+      {!loading && (
+        <div className="profile-count">
+          {filterNames.length > 0
+            ? `${displayProfiles.length} of ${profiles.length} warehouse profiles`
+            : `${profiles.length} warehouse profiles`}
+        </div>
+      )}
 
       <div className="profile-grid">
-        {profiles.map(p => {
+        {displayProfiles.map(p => {
           const m      = p.metadata || {}
           const atRisk = (m.critical_count || 0) + (m.stockout_count || 0)
           const rc     = atRisk > 3 ? '#ef4444' : atRisk > 0 ? '#f59e0b' : '#22c55e'
@@ -394,13 +431,28 @@ function ShipmentIncidentsTab({ drilldown, onClearDrilldown }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Incidents() {
+  const location = useLocation()
   const { queryIncidents } = useAppContext()
-  const [activeTab, setActiveTab] = useState(queryIncidents.length > 0 ? 'shipments' : 'suppliers')
+
+  // Navigation state injected by ChatMessage "View Profiles" button
+  const navState = location.state || {}
+
+  const [activeTab, setActiveTab] = useState(
+    navState.tab || (queryIncidents.length > 0 ? 'shipments' : 'suppliers')
+  )
   const [drilldown, setDrilldown] = useState(null)
+  const [navFilterNames, setNavFilterNames] = useState(navState.filterNames || [])
+  const [navWarehouseNames, setNavWarehouseNames] = useState(navState.warehouseNames || [])
 
   const handleDrilldown = (type, id, name) => {
     setDrilldown({ type, id, name })
     setActiveTab('shipments')
+  }
+
+  const handleTabChange = (key) => {
+    setActiveTab(key)
+    if (navFilterNames.length > 0 && key !== 'suppliers') setNavFilterNames([])
+    if (navWarehouseNames.length > 0 && key !== 'warehouses') setNavWarehouseNames([])
   }
 
   const tabs = [
@@ -420,19 +472,27 @@ export default function Incidents() {
         {tabs.map(t => (
           <button key={t.key}
             className={`sub-tab ${activeTab === t.key ? 'sub-tab--active' : ''}`}
-            onClick={() => setActiveTab(t.key)}>
+            onClick={() => handleTabChange(t.key)}>
             <span className="sub-tab__icon">{t.icon}</span>
             <span>{t.label}</span>
             {t.hint && <span className="sub-tab__hint">{t.hint}</span>}
             {t.key === 'shipments' && drilldown && (
               <span className="sub-tab__dot" title={`Filtered: ${drilldown.name}`} />
             )}
+            {t.key === 'suppliers' && navFilterNames.length > 0 && activeTab === 'suppliers' && (
+              <span className="sub-tab__dot" title={`Filtered: ${navFilterNames.join(', ')}`} />
+            )}
+            {t.key === 'warehouses' && navWarehouseNames.length > 0 && activeTab === 'warehouses' && (
+              <span className="sub-tab__dot" title={`Filtered: ${navWarehouseNames.join(', ')}`} />
+            )}
           </button>
         ))}
       </div>
 
-      {activeTab === 'suppliers'  && <SupplierProfilesTab  onDrilldown={handleDrilldown} />}
-      {activeTab === 'warehouses' && <WarehouseProfilesTab onDrilldown={handleDrilldown} />}
+      {activeTab === 'suppliers'  && (
+        <SupplierProfilesTab onDrilldown={handleDrilldown} filterNames={navFilterNames} />
+      )}
+      {activeTab === 'warehouses' && <WarehouseProfilesTab onDrilldown={handleDrilldown} filterNames={navWarehouseNames} />}
       {activeTab === 'shipments'  && (
         <ShipmentIncidentsTab
           drilldown={drilldown}

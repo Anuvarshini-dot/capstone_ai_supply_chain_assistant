@@ -38,15 +38,34 @@ Return ONLY a valid JSON object:
 class SupplierRiskAgent(BaseAgent):
     name = "supplier_risk"
 
-    def analyze(self, query: str, incidents: list = None) -> dict:
+    def analyze(self, query: str, incidents: list = None, sql_entities: dict = None) -> dict:
         if incidents is None:
             raw = hybrid_search(query, top_k=20, filters={"severity": ["medium", "high"]})
             incidents = rerank(query, raw, top_k=5)
 
         incident_text = self._format_incidents(incidents)
+
+        # When SQL identified specific suppliers, constrain the agent to those names only.
+        # This prevents the agent from re-ranking by its own metric and introducing
+        # suppliers that the SQL query did not identify.
+        sql_supplier_names = (sql_entities or {}).get("supplier_names", [])
+        entity_constraint = ""
+        if sql_supplier_names:
+            entity_constraint = (
+                f"\n\nSQL DATABASE QUERY IDENTIFIED EXACTLY THESE SUPPLIERS (already ranked): "
+                f"{', '.join(sql_supplier_names)}\n"
+                "STRICT RULES:\n"
+                "1. Analyse ONLY the suppliers listed above — no others.\n"
+                "2. Do NOT re-rank or substitute them. SQL already determined the ranking.\n"
+                "3. Your low_performers list must contain ONLY names from the list above.\n"
+                "4. Use the profile documents to add context (delay rate, risk tier, inventory "
+                "   impact) for these specific suppliers — do not use the documents to find "
+                "   different suppliers."
+            )
+
         response = self._call_llm(
             SYSTEM,
-            f"Query: {query}\n\nOrders:\n{incident_text}\n\nAnalyze and return JSON."
+            f"Query: {query}\n\nDocuments:\n{incident_text}{entity_constraint}\n\nAnalyse and return JSON."
         )
 
         result = self._parse_json(response, {

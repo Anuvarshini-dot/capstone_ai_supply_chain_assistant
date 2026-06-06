@@ -140,36 +140,82 @@ def retrieve_node(state: SupplyChainState) -> dict:
     t0    = time.time()
     query = state["query"]
 
-    # When SQL ran first (hybrid path), enrich the retrieval query with entity names
-    # so ChromaDB returns docs about the specific suppliers/warehouses SQL identified.
-    sql_entities = state.get("sql_entities") or {}
-    entity_names = (
-        sql_entities.get("supplier_names", []) +
-        sql_entities.get("warehouse_names", []) +
-        sql_entities.get("product_names", [])
-    )
-    retrieval_query = f"{query} {' '.join(entity_names[:4])}" if entity_names else query
+    sql_entities    = state.get("sql_entities") or {}
+    supplier_names  = sql_entities.get("supplier_names",  [])
+    warehouse_names = sql_entities.get("warehouse_names", [])
+    all_entity_names = supplier_names + warehouse_names
 
-    raw = hybrid_search(retrieval_query, top_k=20, filters=state.get("filters") or None)
-    top = rerank(query, raw, top_k=state.get("top_k", 5))
+    retrieval_query = f"{query} {' '.join(all_entity_names[:4])}" if all_entity_names else query
+    user_filters    = state.get("filters") or {}
+    target_k        = state.get("top_k", 5)
 
-    entity_note = f" (entity-targeted: {', '.join(entity_names[:3])})" if entity_names else ""
+    # ── Step 1: Fetch pre-aggregated profile docs for SQL-identified entities ──
+    # Profiles contain delay rates, avg/max delay, inventory impact — better than
+    # individual shipment events for supplier/warehouse performance questions.
+    profile_docs: list = []
+    if supplier_names:
+        profile_filter = {"doc_type": "supplier_profile", "supplier_name": supplier_names}
+        profile_docs = hybrid_search(query, top_k=min(len(supplier_names), 8),
+                                     filters=profile_filter)
+    elif warehouse_names:
+        profile_filter = {"doc_type": "warehouse_profile", "warehouse_name": warehouse_names}
+        profile_docs = hybrid_search(query, top_k=min(len(warehouse_names), 5),
+                                     filters=profile_filter)
+
+    # ── Step 2: Fetch shipment event docs for incident-level context ───────────
+    entity_filter: dict = {}
+    if supplier_names:
+        entity_filter["supplier_name"] = supplier_names
+    elif warehouse_names:
+        entity_filter["warehouse_name"] = warehouse_names
+
+    combined_filters = {**entity_filter, **user_filters} if entity_filter else user_filters or None
+    shipment_docs = hybrid_search(retrieval_query, top_k=15, filters=combined_filters)
+
+    # Fallback: if entity filter was too restrictive, relax to user filters only
+    if len(shipment_docs) < 2 and entity_filter:
+        shipment_docs = hybrid_search(retrieval_query, top_k=15, filters=user_filters or None)
+
+    # ── Step 3: Combine — profiles guaranteed first, shipments fill remaining ──
+    seen: set = set()
+    combined: list = []
+    for doc in profile_docs:
+        if doc["id"] not in seen:
+            seen.add(doc["id"])
+            combined.append(doc)
+
+    remaining = max(target_k - len(combined), 2)
+    for doc in rerank(query, shipment_docs, top_k=remaining):
+        if doc["id"] not in seen:
+            seen.add(doc["id"])
+            combined.append(doc)
+
+    profile_count  = sum(1 for d in combined
+                         if d.get("metadata", {}).get("doc_type")
+                         in ("supplier_profile", "warehouse_profile"))
+    shipment_count = len(combined) - profile_count
+    entity_note    = f" (SQL-targeted: {', '.join(all_entity_names[:3])})" if all_entity_names else ""
+
     log = state.get("execution_log", [])
     log.append({
         "step":   "Vector Retrieval",
         "icon":   "🗄️",
-        "detail": f"Hybrid BM25 + Semantic search — {len(top)} incidents retrieved{entity_note}",
-        "docs_retrieved": len(top),
+        "detail": f"{profile_count} profiles + {shipment_count} shipments retrieved{entity_note}",
+        "docs_retrieved": len(combined),
         "ms":     round((time.time() - t0) * 1000),
     })
-    return {"retrieved_incidents": top, "execution_log": log}
+    return {"retrieved_incidents": combined, "execution_log": log}
 
 
 # ── Specialist agent nodes ────────────────────────────────────────────────────
 
 def supplier_node(state: SupplyChainState) -> dict:
     t0 = time.time()
-    findings = SupplierRiskAgent().analyze(state["query"], state["retrieved_incidents"])
+    findings = SupplierRiskAgent().analyze(
+        state["query"],
+        state["retrieved_incidents"],
+        sql_entities=state.get("sql_entities") or {},
+    )
     log = state.get("execution_log", [])
     log.append({
         "step":     "Supplier Risk Agent",
@@ -307,10 +353,11 @@ def nlsql_node(state: SupplyChainState) -> dict:
             raw_result = "No data found."
         else:
             raw_result = df.to_string(index=False)
-            # Build clean display facts from the DataFrame (max 2 result rows, 5 cols)
-            for _, row in df.head(2).iterrows():
-                for col in list(df.columns)[:5]:
-                    val  = row[col]
+            # Build display facts: 3 result rows × 2 key columns = 6 facts (card cap).
+            # 3 rows ensures the display and the entity-targeting list are the same size.
+            for _, row in df.head(3).iterrows():
+                for col in list(df.columns)[:2]:
+                    val   = row[col]
                     label = str(col).replace('_', ' ').title()
                     if isinstance(val, float):
                         is_rate = any(k in col.lower() for k in ('rate', 'pct', 'score', 'defect', 'reliability'))
@@ -321,17 +368,20 @@ def nlsql_node(state: SupplyChainState) -> dict:
                         val_str = str(val)
                     display_facts.append(f"{label}: {val_str}")
 
-        # Extract named entities from SQL result for targeted ChromaDB retrieval downstream
+        # Extract named entities from SQL result for targeted ChromaDB retrieval.
+        # Limit to 3 — same count as display_facts rows — so the card display and the
+        # ChromaDB/Risk-Agent targeting always reference the exact same entity set.
         sql_entities: dict = {
-            "supplier_ids":    re.findall(r'\b(SUP-\d+)\b', raw_result)[:5],
-            "warehouse_ids":   re.findall(r'\b(WH-\d+)\b',  raw_result)[:5],
+            "supplier_ids":    re.findall(r'\b(SUP-\d+)\b', raw_result)[:3],
+            "warehouse_ids":   re.findall(r'\b(WH-\d+)\b',  raw_result)[:3],
             "supplier_names":  [],
             "warehouse_names": [],
             "product_names":   [],
         }
         for col in df.columns:
             col_l = col.lower()
-            vals  = [v for v in df[col].dropna().unique().tolist() if isinstance(v, str)][:5]
+            # unique() preserves SQL ORDER BY order (first occurrence = top-ranked row)
+            vals  = [v for v in df[col].dropna().unique().tolist() if isinstance(v, str)][:3]
             if "supplier_name" in col_l:
                 sql_entities["supplier_names"].extend(vals)
             elif "warehouse_name" in col_l:

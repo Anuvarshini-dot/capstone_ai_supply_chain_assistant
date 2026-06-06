@@ -1,13 +1,13 @@
 .incidents-page { display: flex; flex-direction: column; gap: 20px; }
 
-.incidents-header h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.incidents-header h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
 .incidents-header p  { font-size: 14px; color: var(--text-muted); }
 
 /* ── Sub-tabs ─────────────────────────────────────────────────────────── */
 .sub-tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
   padding-bottom: 0;
 }
 
@@ -26,7 +26,7 @@
   transition: color 0.15s, border-color 0.15s;
   white-space: nowrap;
   position: relative;
-  margin-bottom: -1px;
+  margin-bottom: -2px;
 }
 
 .sub-tab:hover { color: var(--text-primary); }
@@ -34,6 +34,7 @@
 .sub-tab--active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+  font-weight: 600;
 }
 
 .sub-tab__icon { font-size: 15px; }
@@ -41,7 +42,7 @@
 .sub-tab__hint {
   font-size: 11px;
   color: var(--text-muted);
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1px 7px;
@@ -59,10 +60,11 @@
 
 /* ── Filters ──────────────────────────────────────────────────────────── */
 .incidents-filters {
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
 }
 
 .filter-grid {
@@ -79,52 +81,55 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 5px;
+  font-weight: 600;
 }
 
 .filter-field input,
 .filter-field select {
   width: 100%;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-primary);
   padding: 8px 10px;
   font-size: 13px;
+  transition: border-color 0.2s;
 }
 
 .filter-field input:focus,
-.filter-field select:focus { outline: none; border-color: var(--accent); }
+.filter-field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
 
 .filter-actions { display: flex; gap: 10px; }
 
 /* ── Buttons ──────────────────────────────────────────────────────────── */
 .btn-primary {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), #8b5cf6);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 8px 20px;
+  border-radius: 8px;
+  padding: 8px 22px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: opacity 0.2s, transform 0.15s;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.3);
 }
 
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover, #3b82f6); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; transform: none; }
 
 .btn-ghost {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-secondary);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 8px 16px;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,0.05); }
 
 /* ── Profile count line ───────────────────────────────────────────────── */
 .profile-count {
@@ -136,21 +141,26 @@
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .profile-card {
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 14px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: border-color 0.15s;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
 }
 
-.profile-card:hover { border-color: var(--accent); }
+.profile-card:hover {
+  border-color: rgba(99,102,241,0.4);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
 
 .profile-card__header {
   display: flex;
@@ -166,11 +176,11 @@
   min-width: 0;
 }
 
-.profile-card__icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.profile-card__icon { font-size: 24px; flex-shrink: 0; margin-top: 2px; }
 
 .profile-card__title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   line-height: 1.3;
 }
@@ -181,11 +191,10 @@
   margin-top: 2px;
 }
 
-/* reuse risk-pill from ChatMessage */
 .risk-pill {
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 20px;
   border: 1px solid;
   white-space: nowrap;
@@ -197,8 +206,9 @@
   display: flex;
   gap: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
+  background: var(--bg-primary);
 }
 
 .metric {
@@ -207,7 +217,7 @@
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 8px 4px;
+  padding: 10px 4px;
   border-right: 1px solid var(--border);
 }
 
@@ -219,10 +229,11 @@
   text-transform: uppercase;
   letter-spacing: 0.4px;
   text-align: center;
+  font-weight: 600;
 }
 
 .metric__value {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -233,8 +244,8 @@
   background: transparent;
   border: 1px solid var(--accent);
   color: var(--accent);
-  border-radius: 6px;
-  padding: 6px 14px;
+  border-radius: 8px;
+  padding: 6px 16px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -244,6 +255,7 @@
 .drill-btn:hover {
   background: var(--accent);
   color: #fff;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.3);
 }
 
 /* ── Drill-down banner ────────────────────────────────────────────────── */
@@ -252,10 +264,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: rgba(79, 142, 247, 0.08);
-  border: 1px solid rgba(79, 142, 247, 0.35);
-  border-radius: 8px;
-  padding: 10px 16px;
+  background: rgba(99,102,241,0.06);
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: 10px;
+  padding: 12px 18px;
   font-size: 13px;
   color: var(--text-primary);
 }
@@ -267,10 +279,10 @@
 
 .drilldown-clear {
   background: transparent;
-  border: 1px solid rgba(79, 142, 247, 0.4);
+  border: 1px solid rgba(99,102,241,0.4);
   color: var(--accent);
-  border-radius: 6px;
-  padding: 4px 12px;
+  border-radius: 8px;
+  padding: 4px 14px;
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
@@ -278,15 +290,15 @@
 }
 
 .drilldown-clear:hover {
-  background: rgba(79, 142, 247, 0.12);
+  background: rgba(99,102,241,0.1);
 }
 
 /* ── Error / misc ─────────────────────────────────────────────────────── */
 .error-banner {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: 8px;
-  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 12px 18px;
   color: #ef4444;
   font-size: 14px;
 }
