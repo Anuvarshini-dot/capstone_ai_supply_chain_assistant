@@ -19,6 +19,9 @@ function LogStep({ entry, index, isLast }) {
         </div>
 
         <p className="log-step__detail">{entry.detail}</p>
+        {entry.sub_query && (
+          <p className="log-step__sub-query">❓ {entry.sub_query}</p>
+        )}
 
         <div className="log-step__meta">
           {entry.risk_level && (
@@ -53,10 +56,22 @@ function LogStep({ entry, index, isLast }) {
           {entry.count != null && (
             <span className="log-pill log-pill--neutral">{entry.count} recommendations</span>
           )}
-          {entry.agents?.length > 0 && entry.agents.map(a => (
+            {entry.agents?.length > 0 && !entry.sub_queries && entry.agents.map(a => (
             <span key={a} className="log-pill log-pill--agent">{a}</span>
           ))}
         </div>
+
+        {entry.sub_queries && Object.keys(entry.sub_queries).length > 0 && (
+          <div className="log-plan">
+            {Object.entries(entry.sub_queries).map(([agent, q]) => (
+              <div key={agent} className="log-plan__row">
+                <span className="log-plan__agent">{agent}</span>
+                <span className="log-plan__arrow">→</span>
+                <span className="log-plan__q">{q}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {entry.top_finding && (
           <div className="log-step__finding">

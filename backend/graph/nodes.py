@@ -86,21 +86,25 @@ def general_check_node(state: SupplyChainState) -> dict:
 
 SPECIALIST_CLASSIFIER_SYSTEM = """You are a supply chain specialist router.
 SQL has already run and extracted exact entity names. Decide which specialist agents
-are needed for deeper risk analysis, AND the order they should run.
+are needed, the order they should run, and write a focused sub-question for each agent.
 
 Available specialists:
 - supplier  : supplier performance, reliability, risk, defect rates
 - shipment  : delivery routes, delays, shipping modes, carriers, regions, at-risk shipments
 - inventory : stock levels, warehouses, stockouts, days of supply
 
-Ordering rules — put the most data-rich agent for this query FIRST:
-- Query is primarily about warehouses/stock → inventory first
-- Query is primarily about supplier risk/reliability → supplier first
-- Query is primarily about routes/delays/carriers → shipment first
-- When agents are equally relevant, default order: supplier → shipment → inventory
-- Return [] if the SQL answer is self-contained and no specialist adds value.
+Rules:
+- Only include agents whose sub-question is genuinely answered by their specialty.
+- If the query has ONE focus (e.g. only about stock levels), return only ONE agent.
+- If the query has TWO distinct parts (e.g. warehouse stock + supplier contribution), return TWO agents.
+- Write each sub_query as a standalone question the agent can answer independently.
+  Use exact entity names from SQL context (e.g. "Los Angeles Fulfillment Hub") in sub-queries.
+- Ordering: put the most data-rich agent for this query FIRST.
+  warehouse/stock focus → inventory first; supplier/risk focus → supplier first; delays → shipment first.
+- Return [] if the SQL answer alone is sufficient and no specialist adds value.
 
-Return ONLY valid JSON with agents in execution order: {"agents": ["inventory", "supplier"]}"""
+Return ONLY valid JSON:
+{"agents": [{"name": "inventory", "sub_query": "which warehouse has the highest stock?"}, {"name": "supplier", "sub_query": "who is the highest contributing supplier to Los Angeles Fulfillment Hub?"}]}"""
 
 
 def classify_node(state: SupplyChainState) -> dict:
@@ -119,7 +123,10 @@ def classify_node(state: SupplyChainState) -> dict:
         entity_lines.append(f"SQL identified products: {', '.join(sql_entities['product_names'])}")
     entity_context = ("\n" + "\n".join(entity_lines)) if entity_lines else ""
 
-    agents: list = []
+    agents:      list = []
+    sub_queries: dict = {}
+    valid = {"supplier", "shipment", "inventory"}
+
     try:
         response = chat([
             {"role": "system", "content": SPECIALIST_CLASSIFIER_SYSTEM},
@@ -127,28 +134,37 @@ def classify_node(state: SupplyChainState) -> dict:
         ])
         start  = response.find("{"); end = response.rfind("}") + 1
         parsed = json.loads(response[start:end])
-        valid  = {"supplier", "shipment", "inventory"}
-        agents = [a for a in parsed.get("agents", []) if a in valid]
+
+        for item in parsed.get("agents", []):
+            if isinstance(item, dict) and item.get("name") in valid:
+                name = item["name"]
+                agents.append(name)
+                sub_queries[name] = item.get("sub_query") or query
+            elif isinstance(item, str) and item in valid:
+                # Fallback: plain string list (old format)
+                agents.append(item)
+                sub_queries[item] = query
     except Exception:
-        # Keyword fallback
+        # Keyword fallback — one agent, full query
         q = query.lower()
         if any(k in q for k in {"supplier", "vendor", "defect", "reliability"}):
-            agents.append("supplier")
+            agents.append("supplier"); sub_queries["supplier"] = query
         if any(k in q for k in {"shipment", "delivery", "carrier", "route", "delay",
                                   "transit", "shipping", "freight", "latam", "region"}):
-            agents.append("shipment")
+            agents.append("shipment"); sub_queries["shipment"] = query
         if any(k in q for k in {"inventory", "stock", "warehouse", "stockout", "reorder"}):
-            agents.append("inventory")
+            agents.append("inventory"); sub_queries["inventory"] = query
 
     log = state.get("execution_log", [])
     log.append({
-        "step":   "Specialist Classification",
-        "icon":   "🎯",
-        "detail": f"Specialists: {', '.join(agents)}" if agents else "No specialists — SQL answer sufficient",
-        "agents": agents,
-        "ms":     round((time.time() - t0) * 1000),
+        "step":        "Specialist Classification",
+        "icon":        "🎯",
+        "detail":      f"{len(agents)} specialist(s) assigned with focused sub-questions" if agents else "No specialists — SQL answer sufficient",
+        "agents":      agents,
+        "sub_queries": sub_queries,
+        "ms":          round((time.time() - t0) * 1000),
     })
-    return {"routed_agents": agents, "execution_log": log}
+    return {"routed_agents": agents, "agent_sub_queries": sub_queries, "execution_log": log}
 
 
 # ── Retrieval ────────────────────────────────────────────────────────────────
@@ -235,24 +251,81 @@ _AGENT_META = {
 }
 
 
-def _run_agent(name: str, state: dict, findings_so_far: dict) -> dict:
-    """Call the right agent class based on name, injecting accumulated context."""
-    query = state["query"]
-    docs  = state["retrieved_incidents"]
+def _targeted_docs(agent_name: str, state: dict, base_docs: list) -> list:
+    """Return docs targeted to this agent's role — profiles first, shipments to fill remaining slots."""
+    sub_query       = (state.get("agent_sub_queries") or {}).get(agent_name) or state["query"]
+    sql_entities    = state.get("sql_entities") or {}
+    supplier_names  = sql_entities.get("supplier_names", [])
+    warehouse_names = sql_entities.get("warehouse_names", [])
+
+    profile_docs:  list = []
+    shipment_docs: list = []
+
+    if agent_name == "supplier":
+        # 1. Supplier profiles — aggregated reliability, risk, lead time
+        if supplier_names:
+            profile_docs = hybrid_search(sub_query, top_k=min(len(supplier_names) + 2, 6),
+                                         filters={"doc_type": "supplier_profile", "supplier_name": supplier_names})
+        else:
+            profile_docs = hybrid_search(sub_query, top_k=4, filters={"doc_type": "supplier_profile"})
+
+        # 2. Shipment events filtered to the identified warehouse (if any) for contribution data
+        if warehouse_names:
+            shipment_docs = hybrid_search(sub_query, top_k=10, filters={"warehouse_name": warehouse_names})
+        elif supplier_names:
+            shipment_docs = hybrid_search(sub_query, top_k=10, filters={"supplier_name": supplier_names})
+
+    elif agent_name == "inventory":
+        # 1. Warehouse profiles — capacity, utilisation, region
+        if warehouse_names:
+            profile_docs = hybrid_search(sub_query, top_k=min(len(warehouse_names) + 2, 6),
+                                         filters={"doc_type": "warehouse_profile", "warehouse_name": warehouse_names})
+        else:
+            profile_docs = hybrid_search(sub_query, top_k=4, filters={"doc_type": "warehouse_profile"})
+
+        # 2. Inventory/shipment events for that warehouse
+        if warehouse_names:
+            shipment_docs = hybrid_search(sub_query, top_k=10, filters={"warehouse_name": warehouse_names})
+
+    elif agent_name == "shipment":
+        # Shipment events: warehouse-targeted if available, else supplier-targeted
+        if warehouse_names:
+            shipment_docs = hybrid_search(sub_query, top_k=15, filters={"warehouse_name": warehouse_names})
+        elif supplier_names:
+            shipment_docs = hybrid_search(sub_query, top_k=15, filters={"supplier_name": supplier_names})
+
+    # Merge: profiles guaranteed first, shipments fill remaining slots
+    seen, combined = set(), []
+    for doc in profile_docs:
+        if doc["id"] not in seen:
+            seen.add(doc["id"])
+            combined.append(doc)
+
+    remaining = max(8 - len(combined), 2)
+    for doc in rerank(sub_query, shipment_docs, top_k=remaining) if shipment_docs else []:
+        if doc["id"] not in seen:
+            seen.add(doc["id"])
+            combined.append(doc)
+
+    return combined if len(combined) >= 2 else base_docs
+
+
+def _run_agent(name: str, sub_query: str, state: dict, findings_so_far: dict, docs: list) -> dict:
+    """Call the right agent class with its focused sub-question and pre-targeted docs."""
     if name == "supplier":
         return SupplierRiskAgent().analyze(
-            query, docs,
+            sub_query, docs,
             sql_entities=state.get("sql_entities") or {},
             prior_findings=findings_so_far,
         )
     if name == "shipment":
         return ShipmentAgent().analyze(
-            query, docs,
+            sub_query, docs,
             prior_findings=findings_so_far,
         )
     if name == "inventory":
         return InventoryAgent().analyze(
-            query, docs,
+            sub_query, docs,
             sql_answer=state.get("answer", ""),
             prior_findings=findings_so_far,
         )
@@ -260,26 +333,34 @@ def _run_agent(name: str, state: dict, findings_so_far: dict) -> dict:
 
 
 def orchestrator_node(state: SupplyChainState) -> dict:
-    """Run specialist agents in the classifier-determined order, passing accumulated findings forward."""
-    ordered = [a for a in state["routed_agents"] if a in _AGENT_META]
-    findings = dict(state.get("agent_findings", {}))
-    log      = list(state.get("execution_log", []))
+    """Run specialist agents in classifier-determined order, each with its own focused sub-question."""
+    ordered     = [a for a in state["routed_agents"] if a in _AGENT_META]
+    sub_queries = state.get("agent_sub_queries") or {}
+    findings    = dict(state.get("agent_findings", {}))
+    log         = list(state.get("execution_log", []))
 
     t_total = time.time()
 
-    # Header log entry — records the execution plan
+    # Header log entry — records the execution plan with each agent's sub-question
+    plan_detail = " → ".join(
+        f"{a} ({sub_queries.get(a, '...')})" for a in ordered
+    )
     log.append({
         "step":   "Orchestrator",
         "icon":   "🎛️",
-        "detail": f"Running {len(ordered)} agent(s) in order: {' → '.join(ordered)}",
+        "detail": f"Running {len(ordered)} agent(s): {plan_detail}",
         "agents": ordered,
         "ms":     0,
     })
     header_idx = len(log) - 1
 
+    base_docs = state["retrieved_incidents"]
+
     for agent_name in ordered:
-        t0     = time.time()
-        result = _run_agent(agent_name, state, findings)
+        t0        = time.time()
+        sub_query = sub_queries.get(agent_name) or state["query"]
+        docs      = _targeted_docs(agent_name, state, base_docs)
+        result    = _run_agent(agent_name, sub_query, state, findings, docs)
         findings[agent_name] = result
 
         top_finding = result.get("findings", [None])[0]
@@ -287,6 +368,7 @@ def orchestrator_node(state: SupplyChainState) -> dict:
             "step":           _AGENT_META[agent_name]["label"],
             "icon":           _AGENT_META[agent_name]["icon"],
             "detail":         result.get("summary", "")[:120],
+            "sub_query":      sub_query if sub_query != state["query"] else None,
             "risk_level":     result.get("risk_level", "unknown"),
             "confidence":     round(result.get("confidence", 0) * 100),
             "findings_count": len(result.get("findings", [])),

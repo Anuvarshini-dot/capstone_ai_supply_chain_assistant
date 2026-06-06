@@ -8,7 +8,8 @@ class SupplyChainState(TypedDict):
     top_k:               int
 
     # ── Routing ──────────────────────────────────────────────────
-    routed_agents:       List[str]   # e.g. ["supplier", "shipment"] or ["nlsql"] or ["general"]
+    routed_agents:       List[str]   # e.g. ["inventory", "supplier"] — ordered by classifier
+    agent_sub_queries:   Optional[dict]  # e.g. {"inventory": "which warehouse...", "supplier": "who supplies LA Hub?"}
 
     # ── Retrieval ─────────────────────────────────────────────────
     retrieved_incidents: List[dict]

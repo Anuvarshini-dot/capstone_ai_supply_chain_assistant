@@ -25,6 +25,7 @@ async def query_endpoint(request: QueryRequest):
         "filters":             filters or {},
         "top_k":               request.top_k,
         "routed_agents":       [],
+        "agent_sub_queries":   None,
         "retrieved_incidents": [],
         "agent_findings":      {},
         "sql_result":          None,
