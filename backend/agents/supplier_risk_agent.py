@@ -38,7 +38,7 @@ Return ONLY a valid JSON object:
 class SupplierRiskAgent(BaseAgent):
     name = "supplier_risk"
 
-    def analyze(self, query: str, incidents: list = None, sql_entities: dict = None) -> dict:
+    def analyze(self, query: str, incidents: list = None, sql_entities: dict = None, prior_findings: dict = None) -> dict:
         if incidents is None:
             raw = hybrid_search(query, top_k=20, filters={"severity": ["medium", "high"]})
             incidents = rerank(query, raw, top_k=5)

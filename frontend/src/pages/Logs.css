@@ -170,6 +170,55 @@
   letter-spacing: 0.04em;
 }
 
+/* ── Entity / finding rows ────────────────────────────────── */
+.log-step__finding {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.log-step__finding-label,
+.log-step__entities-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.log-step__finding-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.log-step__entities {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.log-pill--entity {
+  color: #0369a1;
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.log-pill--warn {
+  color: #b45309;
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
 /* ── SQL disclosure ───────────────────────────────────────── */
 .log-sql {
   margin-top: 10px;

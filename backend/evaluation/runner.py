@@ -131,9 +131,14 @@ Respond with ONLY this JSON:
 {{"score": <float 0.0-1.0>, "reason": "<one sentence>"}}"""
 
 
-def _measure_faithfulness(answer: str, retrieval_context: list, threshold: float = 0.5) -> dict:
+def _measure_faithfulness(answer: str, retrieval_context: list, sql_data: str = "", threshold: float = 0.5) -> dict:
     try:
-        context_text = "\n---\n".join(retrieval_context[:5]) if retrieval_context else "(none)"
+        # SQL query results are the primary ground truth — prepend them so the
+        # faithfulness check can verify numeric claims that come from the database
+        # rather than from the ChromaDB vector store.
+        sql_block = f"[SQL Query Results]\n{sql_data}" if sql_data else ""
+        parts = ([sql_block] if sql_block else []) + retrieval_context[:5]
+        context_text = "\n---\n".join(parts) if parts else "(none)"
         prompt = _FAITHFULNESS_PROMPT.format(context=context_text, answer=answer)
         data   = _llm_json(prompt)
         return _score_result(data, threshold)
@@ -182,7 +187,7 @@ def _measure_contextual_relevancy(query: str, retrieval_context: list, threshold
 
 # ── Main evaluation function ──────────────────────────────────────────────────
 
-def evaluate_query(query: str, answer: str, retrieved_docs: list) -> dict:
+def evaluate_query(query: str, answer: str, retrieved_docs: list, sql_data: str = "") -> dict:
     """
     Run all five evaluation metrics for a single query / answer / context triple.
 
@@ -243,7 +248,7 @@ def evaluate_query(query: str, answer: str, retrieved_docs: list) -> dict:
     retrieval_context = [d.get("text", "") for d in retrieved_docs[:5]]
 
     results["answer_relevancy"]    = _measure_answer_relevancy(query, answer)
-    results["faithfulness"]        = _measure_faithfulness(answer, retrieval_context)
+    results["faithfulness"]        = _measure_faithfulness(answer, retrieval_context, sql_data=sql_data)
     results["contextual_relevancy"] = _measure_contextual_relevancy(query, retrieval_context)
 
     return results

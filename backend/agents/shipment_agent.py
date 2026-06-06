@@ -36,7 +36,7 @@ Return ONLY a valid JSON object:
 class ShipmentAgent(BaseAgent):
     name = "shipment"
 
-    def analyze(self, query: str, incidents: list = None) -> dict:
+    def analyze(self, query: str, incidents: list = None, prior_findings: dict = None) -> dict:
         if incidents is None:
             raw = hybrid_search(
                 query, top_k=20,

@@ -1,6 +1,15 @@
 """
 LangGraph node functions for the supply chain query pipeline.
 Each node receives the full state, does its work, and returns a partial state update.
+
+Execution order:
+  general_check_node → (general) → general_node → END
+  general_check_node → (supply chain) → nlsql_node → classify_node
+    → (specialists) → retrieve_node → orchestrator_node → summary_node → recommendation_node → END
+    → (no specialists) → recommendation_node → END
+
+The orchestrator_node runs specialist agents in the order chosen by classify_node,
+passing accumulated findings from earlier agents into later ones.
 """
 import json
 import os
@@ -16,47 +25,22 @@ from agents.shipment_agent import ShipmentAgent
 from agents.inventory_agent import InventoryAgent
 from agents.recommendation_agent import RecommendationAgent
 from agents.summary_agent import SummaryAgent
+from agents.nlsql_agent import NLSQLAgent
 from retrieval.hybrid_search import hybrid_search
 from retrieval.reranker import rerank
 from llm.client import chat
-from config import SQLITE_DB_PATH
 
 
-# ── Classifier ────────────────────────────────────────────────────────────────
+# ── General check ────────────────────────────────────────────────────────────
 
-CLASSIFIER_SYSTEM = """You are a supply chain query classifier.
-Classify the user query into one or more of these routing targets:
+GENERAL_CHECK_SYSTEM = """You are a supply chain query filter.
+Determine if the query is related to supply chain operations (suppliers, shipments,
+inventory, warehouses, logistics, delivery, products, carriers, routes) or completely unrelated.
 
-- supplier  : questions about specific suppliers, their performance, reliability, risk
-- shipment  : questions about delivery routes, delays, shipping modes, carriers, regions,
-              delivery status, at-risk shipments
-- inventory : questions about stock levels, warehouses, stockouts, days of supply
-- nlsql     : aggregation/calculation/ranking questions that need exact numbers across
-              ALL data (e.g. "average delay", "top 5 suppliers by...", "total count of",
-              "rank all...", "how many... in total", "highest/lowest X", "who contributes most")
-- general   : use ONLY when the ENTIRE query has zero supply chain relevance
+Return ONLY valid JSON: {"is_supply_chain": true} or {"is_supply_chain": false}
+Return false ONLY if the query has zero supply chain content whatsoever."""
 
-Rules:
-- Return ["nlsql"] for any question needing precise aggregation or full-dataset ranking.
-- Return ONE OR MORE of [supplier, shipment, inventory] for risk/analysis/contextual questions.
-- COMPOUND QUERIES: A query can combine specialist agents WITH nlsql when it has BOTH
-  a risk/analysis part AND a ranking/aggregation part.
-  Examples:
-    "Which warehouses are critical? and who is the highest supplier in Asia?"
-    → ["inventory", "nlsql"]   (warehouse risk = inventory, highest supplier = nlsql)
-    "What shipments are delayed in LATAM? and what is the average delay overall?"
-    → ["shipment", "nlsql"]
-    "Are there stockouts? and who ships the most to Singapore?"
-    → ["inventory", "nlsql"]
-- MIXED QUERIES with off-topic content: classify ONLY on supply chain parts, ignore off-topic.
-  Example: "What shipments are at risk? and what is a computer mouse" → ["shipment"]
-- Return ["general"] ONLY when the entire query has zero supply chain relevance.
-- NEVER return ["general"] if any supply chain term is present.
-
-Return ONLY valid JSON: {"agents": ["inventory", "nlsql"]}"""
-
-
-# Supply chain signal words — used as a safety net in classify_node
+# Supply chain signal words — safety net for the general check
 _SC_KEYWORDS = {
     "supplier", "shipment", "delivery", "warehouse", "inventory", "stock",
     "carrier", "route", "delay", "risk", "defect", "order", "product",
@@ -66,68 +50,101 @@ _SC_KEYWORDS = {
 }
 
 
-def classify_node(state: SupplyChainState) -> dict:
+def general_check_node(state: SupplyChainState) -> dict:
+    """Binary check: supply chain query or off-topic? Runs before everything else."""
     t0    = time.time()
     query = state["query"]
 
-    response = chat([
-        {"role": "system", "content": CLASSIFIER_SYSTEM},
-        {"role": "user",   "content": f"Classify: {query}"}
-    ])
-    agents = ["supplier", "shipment", "inventory"]
+    is_supply_chain = True  # safe default
     try:
-        start  = response.find("{")
-        end    = response.rfind("}") + 1
+        response = chat([
+            {"role": "system", "content": GENERAL_CHECK_SYSTEM},
+            {"role": "user",   "content": f"Query: {query}"}
+        ])
+        start = response.find("{"); end = response.rfind("}") + 1
         parsed = json.loads(response[start:end])
-        valid  = {"supplier", "shipment", "inventory", "nlsql", "general"}
-        agents = [a for a in parsed.get("agents", []) if a in valid] or agents
+        is_supply_chain = parsed.get("is_supply_chain", True)
     except Exception:
         pass
 
-    # Safety net: if LLM returned ["general"] but the query contains supply chain
-    # keywords, override to the most relevant specialist agents
-    if agents == ["general"]:
-        q_lower = query.lower()
-        if any(kw in q_lower for kw in _SC_KEYWORDS):
-            # Re-classify with a focused second call on just the supply chain part
-            focused = chat([
-                {"role": "system", "content": CLASSIFIER_SYSTEM},
-                {
-                    "role": "user",
-                    "content": (
-                        f"This query contains supply chain content. "
-                        f"Classify ONLY the supply chain parts, ignore off-topic parts.\n"
-                        f"Query: {query}"
-                    )
-                }
-            ])
-            try:
-                s2 = focused.find("{"); e2 = focused.rfind("}") + 1
-                p2 = json.loads(focused[s2:e2])
-                sc_agents = [a for a in p2.get("agents", [])
-                             if a in {"supplier", "shipment", "inventory", "nlsql"}]
-                if sc_agents:
-                    agents = sc_agents
-            except Exception:
-                # Fallback: keyword-based heuristic
-                agents = []
-                if any(k in q_lower for k in {"supplier", "vendor", "defect", "reliability"}):
-                    agents.append("supplier")
-                if any(k in q_lower for k in {"shipment", "delivery", "carrier", "route",
-                                               "delay", "transit", "shipping", "freight",
-                                               "latam", "europe", "usca", "region"}):
-                    agents.append("shipment")
-                if any(k in q_lower for k in {"inventory", "stock", "warehouse",
-                                               "stockout", "reorder", "fulfillment"}):
-                    agents.append("inventory")
-                if not agents:
-                    agents = ["general"]   # truly no SC content found
+    # Safety net: keyword override
+    if not is_supply_chain and any(kw in query.lower() for kw in _SC_KEYWORDS):
+        is_supply_chain = True
+
+    agents = ["supply_chain"] if is_supply_chain else ["general"]
+    log    = state.get("execution_log", [])
+    log.append({
+        "step":   "General Check",
+        "icon":   "🔍",
+        "detail": "Supply chain query — proceeding" if is_supply_chain else "Off-topic — routing to general QA",
+        "ms":     round((time.time() - t0) * 1000),
+    })
+    return {"routed_agents": agents, "execution_log": log}
+
+
+# ── Specialist classifier ────────────────────────────────────────────────────
+
+SPECIALIST_CLASSIFIER_SYSTEM = """You are a supply chain specialist router.
+SQL has already run and extracted exact entity names. Decide which specialist agents
+are needed for deeper risk analysis, AND the order they should run.
+
+Available specialists:
+- supplier  : supplier performance, reliability, risk, defect rates
+- shipment  : delivery routes, delays, shipping modes, carriers, regions, at-risk shipments
+- inventory : stock levels, warehouses, stockouts, days of supply
+
+Ordering rules — put the most data-rich agent for this query FIRST:
+- Query is primarily about warehouses/stock → inventory first
+- Query is primarily about supplier risk/reliability → supplier first
+- Query is primarily about routes/delays/carriers → shipment first
+- When agents are equally relevant, default order: supplier → shipment → inventory
+- Return [] if the SQL answer is self-contained and no specialist adds value.
+
+Return ONLY valid JSON with agents in execution order: {"agents": ["inventory", "supplier"]}"""
+
+
+def classify_node(state: SupplyChainState) -> dict:
+    """Specialist-only classifier. Runs after nlsql_node so sql_entities are available."""
+    t0           = time.time()
+    query        = state["query"]
+    sql_entities = state.get("sql_entities") or {}
+
+    # Build entity context for the classifier
+    entity_lines = []
+    if sql_entities.get("supplier_names"):
+        entity_lines.append(f"SQL identified suppliers: {', '.join(sql_entities['supplier_names'])}")
+    if sql_entities.get("warehouse_names"):
+        entity_lines.append(f"SQL identified warehouses: {', '.join(sql_entities['warehouse_names'])}")
+    if sql_entities.get("product_names"):
+        entity_lines.append(f"SQL identified products: {', '.join(sql_entities['product_names'])}")
+    entity_context = ("\n" + "\n".join(entity_lines)) if entity_lines else ""
+
+    agents: list = []
+    try:
+        response = chat([
+            {"role": "system", "content": SPECIALIST_CLASSIFIER_SYSTEM},
+            {"role": "user",   "content": f"Query: {query}{entity_context}"}
+        ])
+        start  = response.find("{"); end = response.rfind("}") + 1
+        parsed = json.loads(response[start:end])
+        valid  = {"supplier", "shipment", "inventory"}
+        agents = [a for a in parsed.get("agents", []) if a in valid]
+    except Exception:
+        # Keyword fallback
+        q = query.lower()
+        if any(k in q for k in {"supplier", "vendor", "defect", "reliability"}):
+            agents.append("supplier")
+        if any(k in q for k in {"shipment", "delivery", "carrier", "route", "delay",
+                                  "transit", "shipping", "freight", "latam", "region"}):
+            agents.append("shipment")
+        if any(k in q for k in {"inventory", "stock", "warehouse", "stockout", "reorder"}):
+            agents.append("inventory")
 
     log = state.get("execution_log", [])
     log.append({
-        "step":   "Query Classification",
-        "icon":   "🔍",
-        "detail": f"Routed to: {', '.join(agents)}",
+        "step":   "Specialist Classification",
+        "icon":   "🎯",
+        "detail": f"Specialists: {', '.join(agents)}" if agents else "No specialists — SQL answer sufficient",
         "agents": agents,
         "ms":     round((time.time() - t0) * 1000),
     })
@@ -198,364 +215,140 @@ def retrieve_node(state: SupplyChainState) -> dict:
 
     log = state.get("execution_log", [])
     log.append({
-        "step":   "Vector Retrieval",
-        "icon":   "🗄️",
-        "detail": f"{profile_count} profiles + {shipment_count} shipments retrieved{entity_note}",
+        "step":           "Vector Retrieval",
+        "icon":           "🗄️",
+        "detail":         f"{profile_count} profiles + {shipment_count} shipments retrieved{entity_note}",
         "docs_retrieved": len(combined),
-        "ms":     round((time.time() - t0) * 1000),
+        "profile_count":  profile_count,
+        "shipment_count": shipment_count,
+        "ms":             round((time.time() - t0) * 1000),
     })
     return {"retrieved_incidents": combined, "execution_log": log}
 
 
-# ── Specialist agent nodes ────────────────────────────────────────────────────
+# ── Orchestrator node ─────────────────────────────────────────────────────────
 
-def supplier_node(state: SupplyChainState) -> dict:
-    t0 = time.time()
-    findings = SupplierRiskAgent().analyze(
-        state["query"],
-        state["retrieved_incidents"],
-        sql_entities=state.get("sql_entities") or {},
-    )
-    log = state.get("execution_log", [])
+_AGENT_META = {
+    "supplier":  {"label": "Supplier Risk Agent", "icon": "🏭"},
+    "shipment":  {"label": "Shipment Agent",       "icon": "🚢"},
+    "inventory": {"label": "Inventory Agent",      "icon": "📦"},
+}
+
+
+def _run_agent(name: str, state: dict, findings_so_far: dict) -> dict:
+    """Call the right agent class based on name, injecting accumulated context."""
+    query = state["query"]
+    docs  = state["retrieved_incidents"]
+    if name == "supplier":
+        return SupplierRiskAgent().analyze(
+            query, docs,
+            sql_entities=state.get("sql_entities") or {},
+            prior_findings=findings_so_far,
+        )
+    if name == "shipment":
+        return ShipmentAgent().analyze(
+            query, docs,
+            prior_findings=findings_so_far,
+        )
+    if name == "inventory":
+        return InventoryAgent().analyze(
+            query, docs,
+            sql_answer=state.get("answer", ""),
+            prior_findings=findings_so_far,
+        )
+    return {}
+
+
+def orchestrator_node(state: SupplyChainState) -> dict:
+    """Run specialist agents in the classifier-determined order, passing accumulated findings forward."""
+    ordered = [a for a in state["routed_agents"] if a in _AGENT_META]
+    findings = dict(state.get("agent_findings", {}))
+    log      = list(state.get("execution_log", []))
+
+    t_total = time.time()
+
+    # Header log entry — records the execution plan
     log.append({
-        "step":     "Supplier Risk Agent",
-        "icon":     "🏭",
-        "detail":   findings.get("summary", "")[:120],
-        "risk_level": findings.get("risk_level", "unknown"),
-        "confidence": round(findings.get("confidence", 0) * 100),
-        "findings_count": len(findings.get("findings", [])),
-        "ms":       round((time.time() - t0) * 1000),
+        "step":   "Orchestrator",
+        "icon":   "🎛️",
+        "detail": f"Running {len(ordered)} agent(s) in order: {' → '.join(ordered)}",
+        "agents": ordered,
+        "ms":     0,
     })
-    return {"agent_findings": {**state.get("agent_findings", {}), "supplier": findings}, "execution_log": log}
+    header_idx = len(log) - 1
 
+    for agent_name in ordered:
+        t0     = time.time()
+        result = _run_agent(agent_name, state, findings)
+        findings[agent_name] = result
 
-def shipment_node(state: SupplyChainState) -> dict:
-    t0 = time.time()
-    findings = ShipmentAgent().analyze(state["query"], state["retrieved_incidents"])
-    log = state.get("execution_log", [])
-    log.append({
-        "step":     "Shipment Agent",
-        "icon":     "🚢",
-        "detail":   findings.get("summary", "")[:120],
-        "risk_level": findings.get("risk_level", "unknown"),
-        "confidence": round(findings.get("confidence", 0) * 100),
-        "findings_count": len(findings.get("findings", [])),
-        "ms":       round((time.time() - t0) * 1000),
-    })
-    return {"agent_findings": {**state.get("agent_findings", {}), "shipment": findings}, "execution_log": log}
+        top_finding = result.get("findings", [None])[0]
+        entry = {
+            "step":           _AGENT_META[agent_name]["label"],
+            "icon":           _AGENT_META[agent_name]["icon"],
+            "detail":         result.get("summary", "")[:120],
+            "risk_level":     result.get("risk_level", "unknown"),
+            "confidence":     round(result.get("confidence", 0) * 100),
+            "findings_count": len(result.get("findings", [])),
+            "top_finding":    str(top_finding)[:100] if top_finding else None,
+            "ms":             round((time.time() - t0) * 1000),
+        }
+        if agent_name == "supplier":
+            affected = result.get("affected_suppliers") or []
+            if affected:
+                entry["affected_suppliers"] = affected[:3]
+        if agent_name == "inventory":
+            warehouses = result.get("at_risk_warehouses") or []
+            if warehouses:
+                entry["warehouses_at_risk"] = warehouses[:3]
+        log.append(entry)
 
+    log[header_idx]["ms"] = round((time.time() - t_total) * 1000)
 
-def inventory_node(state: SupplyChainState) -> dict:
-    t0 = time.time()
-    findings = InventoryAgent().analyze(state["query"], state["retrieved_incidents"])
-    log = state.get("execution_log", [])
-    log.append({
-        "step":     "Inventory Agent",
-        "icon":     "📦",
-        "detail":   findings.get("summary", "")[:120],
-        "risk_level": findings.get("risk_level", "unknown"),
-        "confidence": round(findings.get("confidence", 0) * 100),
-        "findings_count": len(findings.get("findings", [])),
-        "ms":       round((time.time() - t0) * 1000),
-    })
-    return {"agent_findings": {**state.get("agent_findings", {}), "inventory": findings}, "execution_log": log}
+    return {"agent_findings": findings, "execution_log": log}
 
 
 # ── NL-to-SQL node ───────────────────────────────────────────────────────────
 
-_DB_SCHEMA = """
-Tables in the supply chain SQLite database:
-
-suppliers(supplier_id, supplier_name, category, country, region,
-          on_time_delivery_rate, defect_rate, avg_lead_time_days,
-          contract_value_usd, payment_terms, risk_tier, reliability_score, active)
-
-products(product_id, product_name, category, supplier_id,
-         unit_cost_usd, unit_price_usd, weight_kg,
-         reorder_point_units, safety_stock_days)
-
-warehouses(warehouse_id, warehouse_name, city, country, region,
-           capacity_units, current_utilization_pct)
-
-inventory(inventory_id, product_id, warehouse_id,
-          stock_level_units,      -- ← THIS is the inventory/stock level (units on hand)
-          reorder_point_units, avg_daily_demand, days_of_supply,
-          last_replenishment_date, stockout_count_30d,
-          status)                 -- values: healthy, low, critical, stockout
-
-shipments(shipment_id, supplier_id, product_id, destination_warehouse_id,
-          origin_city, origin_country, destination_city, destination_country,
-          order_date, scheduled_delivery_date, actual_delivery_date,
-          delay_days, shipping_mode, carrier,
-          status,                 -- values: Delivered, In Transit, Delayed, Cancelled
-          quantity_units, shipment_cost_usd, is_late, late_delivery_risk,
-          severity, risk_score)
-
-IMPORTANT RULES:
-- "inventory level" or "stock level" always means column: stock_level_units in inventory table
-- "delivery delay" always means column: delay_days in shipments table
-- For warehouse name searches use LIKE: WHERE warehouse_name LIKE '%Tokyo%'
-- inventory.warehouse_id joins to warehouses.warehouse_id
-- shipments.destination_warehouse_id joins to warehouses.warehouse_id
-- shipments.supplier_id joins to suppliers.supplier_id
-- shipments.product_id joins to products.product_id
-
-Warehouse names (WH-01 to WH-15):
-WH-01 Chicago Distribution Center, WH-02 Los Angeles Fulfillment Hub,
-WH-03 Toronto Logistics Center, WH-04 Houston Supply Depot,
-WH-05 Berlin Central Warehouse, WH-06 Paris Distribution Hub,
-WH-07 London Regional Center, WH-08 Amsterdam Port Facility,
-WH-09 São Paulo Distribution Center, WH-10 Bogotá Logistics Hub,
-WH-11 Santiago Supply Depot, WH-12 Singapore Regional Hub,
-WH-13 Tokyo Distribution Center, WH-14 Johannesburg Supply Hub,
-WH-15 Lagos Distribution Center
-"""
-
-
 def nlsql_node(state: SupplyChainState) -> dict:
-    import re
-    import sqlite3
-    import pandas as pd
+    t0     = time.time()
+    result = NLSQLAgent().analyze(state["query"])
 
-    t0    = time.time()
-    query = state["query"]
-
-    # Step 1: Generate SQL using our existing chat() (no LangChain agent needed)
-    sql_response = chat([
-        {
-            "role": "system",
-            "content": (
-                "You are a SQLite expert. Generate a single valid SQLite SQL query "
-                "to answer the user's question using the schema provided. "
-                "Return ONLY the SQL query — no explanation, no markdown.\n\n"
-                "Important rules:\n"
-                "- When results include a supplier, always JOIN suppliers to include supplier_name.\n"
-                "- When results include a product, always JOIN products to include product_name.\n"
-                "- Never return only IDs in results — always include human-readable names."
-            )
-        },
-        {
-            "role": "user",
-            "content": f"Schema:\n{_DB_SCHEMA}\n\nQuestion: {query}"
-        }
-    ])
-
-    # Strip markdown code fences if present
-    sql_query = re.sub(r'```[a-zA-Z]*', '', sql_response).replace('```', '').strip()
-    # Step 2: Execute primary SQL directly against SQLite
-    display_facts = []   # clean human-readable facts for the agent card
-    sql_entities  = None
-    try:
-        conn = sqlite3.connect(SQLITE_DB_PATH)
-        df   = pd.read_sql_query(sql_query, conn)
-
-        if df.empty:
-            raw_result = "No data found."
-        else:
-            raw_result = df.to_string(index=False)
-            # Build display facts: 3 result rows × 2 key columns = 6 facts (card cap).
-            # 3 rows ensures the display and the entity-targeting list are the same size.
-            for _, row in df.head(3).iterrows():
-                for col in list(df.columns)[:2]:
-                    val   = row[col]
-                    label = str(col).replace('_', ' ').title()
-                    if isinstance(val, float):
-                        is_rate = any(k in col.lower() for k in ('rate', 'pct', 'score', 'defect', 'reliability'))
-                        val_str = f"{val:.1%}" if (is_rate and val <= 1) else f"{val:,.2f}"
-                    elif isinstance(val, (int,)):
-                        val_str = f"{val:,}"
-                    else:
-                        val_str = str(val)
-                    display_facts.append(f"{label}: {val_str}")
-
-        # Extract named entities from SQL result for targeted ChromaDB retrieval.
-        # Limit to 3 — same count as display_facts rows — so the card display and the
-        # ChromaDB/Risk-Agent targeting always reference the exact same entity set.
-        sql_entities: dict = {
-            "supplier_ids":    re.findall(r'\b(SUP-\d+)\b', raw_result)[:3],
-            "warehouse_ids":   re.findall(r'\b(WH-\d+)\b',  raw_result)[:3],
-            "supplier_names":  [],
-            "warehouse_names": [],
-            "product_names":   [],
-        }
-        for col in df.columns:
-            col_l = col.lower()
-            # unique() preserves SQL ORDER BY order (first occurrence = top-ranked row)
-            vals  = [v for v in df[col].dropna().unique().tolist() if isinstance(v, str)][:3]
-            if "supplier_name" in col_l:
-                sql_entities["supplier_names"].extend(vals)
-            elif "warehouse_name" in col_l:
-                sql_entities["warehouse_names"].extend(vals)
-            elif "product_name" in col_l:
-                sql_entities["product_names"].extend(vals)
-
-        # Step 2b: Run follow-up context queries to enrich the answer with real names
-        context_result = ""
-        try:
-            # Warehouse query: get product-level inventory breakdown
-            wh_match = re.search(
-                r"warehouse_name\s+LIKE\s+'([^']+)'|warehouse_name\s*=\s*'([^']+)'",
-                sql_query, re.IGNORECASE
-            )
-            wh_id_match = re.search(r"warehouse_id\s*=\s*'([^']+)'", sql_query, re.IGNORECASE)
-
-            if wh_match or wh_id_match:
-                wh_filter = ""
-                if wh_id_match:
-                    wh_filter = f"i.warehouse_id = '{wh_id_match.group(1)}'"
-                elif wh_match:
-                    name_val = wh_match.group(1) or wh_match.group(2)
-                    wh_filter = f"w.warehouse_name LIKE '{name_val}'"
-
-                if wh_filter:
-                    ctx_sql = f"""
-                        SELECT p.product_name,
-                               i.stock_level_units,
-                               i.reorder_point_units,
-                               i.days_of_supply,
-                               i.status,
-                               i.stockout_count_30d
-                        FROM inventory i
-                        JOIN products p ON i.product_id = p.product_id
-                        JOIN warehouses w ON i.warehouse_id = w.warehouse_id
-                        WHERE {wh_filter}
-                        ORDER BY i.stock_level_units ASC
-                        LIMIT 10
-                    """
-                    ctx_df = pd.read_sql_query(ctx_sql, conn)
-                    if not ctx_df.empty:
-                        context_result += "\n\nProduct breakdown (lowest stock first):\n" + ctx_df.to_string(index=False)
-
-            # Supplier query: enrich with supplier name + product-level risk breakdown
-            sup_match = re.search(r'\b(SUP-\d+)\b', raw_result)
-            if sup_match:
-                sup_id = sup_match.group(1)
-
-                # Get supplier name
-                name_df = pd.read_sql_query(
-                    f"SELECT supplier_name FROM suppliers WHERE supplier_id = '{sup_id}'", conn
-                )
-                sup_name = name_df.iloc[0]["supplier_name"] if not name_df.empty else sup_id
-
-                # Products shipped: volume + late rate
-                sup_ctx_sql = f"""
-                    SELECT p.product_name,
-                           SUM(s.quantity_units)                                          AS total_units_shipped,
-                           ROUND(AVG(CASE WHEN s.is_late THEN 1.0 ELSE 0.0 END)*100, 1)  AS late_pct
-                    FROM shipments s
-                    JOIN products p ON s.product_id = p.product_id
-                    WHERE s.supplier_id = '{sup_id}'
-                    GROUP BY p.product_name
-                    ORDER BY total_units_shipped DESC
-                    LIMIT 8
-                """
-                sup_df = pd.read_sql_query(sup_ctx_sql, conn)
-                if not sup_df.empty:
-                    context_result += (
-                        f"\n\nSupplier: {sup_name} ({sup_id})"
-                        f"\nProducts shipped (by volume):\n" + sup_df.to_string(index=False)
-                    )
-
-                # Lowest-performing products: high late rate, low stock
-                risk_ctx_sql = f"""
-                    SELECT p.product_name,
-                           ROUND(AVG(CASE WHEN s.is_late THEN 1.0 ELSE 0.0 END)*100, 1) AS late_pct,
-                           SUM(s.quantity_units)                                          AS total_units,
-                           MIN(i.stock_level_units)                                       AS min_stock,
-                           MIN(i.days_of_supply)                                          AS min_days_supply,
-                           MAX(i.status)                                                  AS worst_inv_status
-                    FROM shipments s
-                    JOIN products p ON s.product_id = p.product_id
-                    LEFT JOIN inventory i ON i.product_id = p.product_id
-                    WHERE s.supplier_id = '{sup_id}'
-                    GROUP BY p.product_name
-                    ORDER BY late_pct DESC, min_stock ASC
-                    LIMIT 5
-                """
-                risk_df = pd.read_sql_query(risk_ctx_sql, conn)
-                if not risk_df.empty:
-                    context_result += f"\n\nRisk breakdown (worst late rate / lowest stock):\n" + risk_df.to_string(index=False)
-
-        except Exception:
-            pass
-
-        conn.close()
-
-    except Exception as e:
-        raw_result = f"SQL execution error: {str(e)}\nQuery attempted: {sql_query}"
-        context_result = ""
-
-    # Step 3: Generate a risk-focused natural language answer from SQL results only
-    answer = chat([
-        {
-            "role": "system",
-            "content": (
-                "You are a supply chain RISK analyst. Your primary job is to surface risks and drive action.\n\n"
-                "When the question asks about positive performance (best, highest, top, most):\n"
-                "1. State the top result in 1-2 sentences using full names (never IDs alone).\n"
-                "2. Immediately pivot to risk: identify the WORST-performing products or items "
-                "from that entity — highest late rates, lowest stock, critical/stockout status.\n"
-                "3. End with 2-3 specific, actionable recommendations to mitigate those risks.\n\n"
-                "When the question asks about negative performance (worst, lowest, failing):\n"
-                "1. Answer directly with the worst performers and their specific risk metrics.\n"
-                "2. Give 2-3 recommendations.\n\n"
-                "Rules:\n"
-                "- Always use full supplier/product names from the data — never IDs alone.\n"
-                "- Be specific with numbers (units, %, days).\n"
-                "- Keep the positive acknowledgment brief (max 2 sentences); spend most space on risks.\n"
-                "- Use markdown: bold for names/numbers, bullet points for breakdowns."
-            )
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Question: {query}\n\n"
-                f"Primary SQL Result:\n{raw_result}"
-                f"{context_result}\n\n"
-                "Answer following the risk-first format above."
-            )
-        }
-    ])
-
-    elapsed = round((time.time() - t0) * 1000)
-
-    # Clean 1-sentence summary from the LLM answer (strip markdown)
-    first_line = answer.split('\n')[0].strip()
-    card_summary = re.sub(r'\*+', '', first_line)[:200]
-
-    card_findings = display_facts[:6] if display_facts else ["No structured data returned"]
+    entities = result.get("sql_entities", {})
+    entity_names = (
+        entities.get("supplier_names", []) +
+        entities.get("warehouse_names", []) +
+        entities.get("product_names", [])
+    )
 
     log = state.get("execution_log", [])
     log.append({
-        "step":          "NL→SQL Agent",
-        "icon":          "🗃️",
-        "detail":        "SQL executed against supply_chain.db",
-        "sql_query":     sql_query,
-        "rows_returned": len(raw_result.splitlines()) - 1 if raw_result != "No data found." else 0,
-        "ms":            elapsed,
+        "step":           "NL→SQL Agent",
+        "icon":           "🗃️",
+        "detail":         f"{len(result['sql_queries'])} SQL query/queries executed",
+        "sql_queries":    result["sql_queries"],
+        "rows_returned":  result.get("rows_returned"),
+        "entities_found": entity_names[:6] if entity_names else None,
+        "ms":             round((time.time() - t0) * 1000),
     })
 
-    # Merge nlsql findings into any existing specialist findings (hybrid path)
-    merged_findings = {
-        **state.get("agent_findings", {}),
-        "nlsql": {
-            "summary":    card_summary,
-            "risk_level": "medium",
-            "confidence": 0.9,
-            "findings":   card_findings,
-            "sql_query":  sql_query,
-            "raw_result": raw_result[:500],
-        }
-    }
-
     return {
-        "sql_result":          f"SQL: {sql_query}\n\nResults:\n{raw_result}",
-        "answer":              answer,
-        "confidence_score":    0.9,
-        "execution_log":       log,
-        "agent_findings":      merged_findings,
-        "retrieved_incidents": state.get("retrieved_incidents", []),
-        "sql_entities":        sql_entities,
+        "sql_result":       "\n\n".join(result["sql_queries"]),
+        "sql_data":         result.get("sql_data", ""),
+        "answer":           result["answer"],
+        "confidence_score": result["confidence"],
+        "execution_log":    log,
+        "agent_findings":   {
+            **state.get("agent_findings", {}),
+            "nlsql": {
+                "summary":     result["summary"],
+                "risk_level":  result["risk_level"],
+                "confidence":  result["confidence"],
+                "findings":    result["findings"],
+                "sql_queries": result["sql_queries"],
+            },
+        },
+        "sql_entities": result["sql_entities"],
     }
 
 
@@ -574,14 +367,17 @@ def summary_node(state: SupplyChainState) -> dict:
     ]
     confidence = round(sum(confidences) / len(confidences), 3) if confidences else 0.5
 
+    anomaly_types = [a.get("type", "").replace("_", " ") for a in anomalies]
+
     log = state.get("execution_log", [])
     log.append({
-        "step":       "Summary Generation",
-        "icon":       "✦",
-        "detail":     f"Confidence: {round(confidence * 100)}% | Anomalies detected: {len(anomalies)}",
-        "confidence": round(confidence * 100),
-        "anomalies":  len(anomalies),
-        "ms":         round((time.time() - t0) * 1000),
+        "step":          "Summary Generation",
+        "icon":          "✦",
+        "detail":        f"Confidence: {round(confidence * 100)}% | Anomalies detected: {len(anomalies)}",
+        "confidence":    round(confidence * 100),
+        "anomalies":     len(anomalies),
+        "anomaly_types": anomaly_types if anomaly_types else None,
+        "ms":            round((time.time() - t0) * 1000),
     })
 
     return {
@@ -669,62 +465,13 @@ def _detect_anomaly_correlations(findings: dict) -> list:
 _SC_AGENTS = {"supplier", "shipment", "inventory"}
 
 
-def route_after_classify(state: SupplyChainState) -> str:
-    agents = state["routed_agents"]
-    if "general" in agents:
+def route_after_general_check(state: SupplyChainState) -> str:
+    if "general" in state["routed_agents"]:
         return "general_node"
-    # nlsql always runs first — both pure-SQL and hybrid paths
-    if "nlsql" in agents:
-        return "nlsql_node"
-    # Specialist-only (no nlsql) → retrieval first
-    return "retrieve_node"
+    return "nlsql_node"
 
 
-def route_after_retrieve(state: SupplyChainState) -> str:
-    agents = state["routed_agents"]
-    if "supplier" in agents:
-        return "supplier_node"
-    if "shipment" in agents:
-        return "shipment_node"
-    if "inventory" in agents:
-        return "inventory_node"
-    return "summary_node"
-
-
-def route_after_supplier(state: SupplyChainState) -> str:
-    agents   = state["routed_agents"]
-    findings = state.get("agent_findings", {})
-    if "shipment" in agents:
-        return "shipment_node"
-    if "inventory" in agents:
-        return "inventory_node"
-    # Only route to nlsql if it hasn't run yet (pure-specialist path, no SQL-first)
-    if "nlsql" in agents and "nlsql" not in findings:
-        return "nlsql_node"
-    return "summary_node"
-
-
-def route_after_shipment(state: SupplyChainState) -> str:
-    agents   = state["routed_agents"]
-    findings = state.get("agent_findings", {})
-    if "inventory" in agents:
-        return "inventory_node"
-    if "nlsql" in agents and "nlsql" not in findings:
-        return "nlsql_node"
-    return "summary_node"
-
-
-def route_after_inventory(state: SupplyChainState) -> str:
-    findings = state.get("agent_findings", {})
-    if "nlsql" in state["routed_agents"] and "nlsql" not in findings:
-        return "nlsql_node"
-    return "summary_node"
-
-
-def route_after_nlsql(state: SupplyChainState) -> str:
-    # Hybrid path: specialist agents still need to run → send to retrieve_node now
-    # (nlsql ran first, so sql_entities are in state for targeted ChromaDB retrieval)
+def route_after_classify(state: SupplyChainState) -> str:
     if any(a in state["routed_agents"] for a in _SC_AGENTS):
         return "retrieve_node"
-    # Pure nlsql path → skip summary, go straight to recommendations
     return "recommendation_node"

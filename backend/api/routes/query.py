@@ -28,6 +28,7 @@ async def query_endpoint(request: QueryRequest):
         "retrieved_incidents": [],
         "agent_findings":      {},
         "sql_result":          None,
+        "sql_data":            None,
         "sql_entities":        None,
         "answer":              "",
         "recommendations":     [],
@@ -44,6 +45,7 @@ async def query_endpoint(request: QueryRequest):
             query=validated_query,
             answer=result.get("answer", ""),
             retrieved_docs=result.get("retrieved_incidents", []),
+            sql_data=result.get("sql_data", ""),
         )
 
         return result

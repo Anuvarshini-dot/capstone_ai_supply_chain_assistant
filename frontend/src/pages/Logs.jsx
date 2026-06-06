@@ -32,6 +32,12 @@ function LogStep({ entry, index, isLast }) {
           {entry.docs_retrieved != null && (
             <span className="log-pill log-pill--neutral">{entry.docs_retrieved} docs</span>
           )}
+          {entry.profile_count != null && (
+            <span className="log-pill log-pill--neutral">{entry.profile_count} profiles</span>
+          )}
+          {entry.shipment_count != null && (
+            <span className="log-pill log-pill--neutral">{entry.shipment_count} shipments</span>
+          )}
           {entry.chromadb_hits != null && (
             <span className="log-pill log-pill--chroma">ChromaDB {entry.chromadb_hits} hits</span>
           )}
@@ -52,10 +58,55 @@ function LogStep({ entry, index, isLast }) {
           ))}
         </div>
 
-        {entry.sql_query && (
+        {entry.top_finding && (
+          <div className="log-step__finding">
+            <span className="log-step__finding-label">Top finding</span>
+            <span className="log-step__finding-text">{entry.top_finding}</span>
+          </div>
+        )}
+
+        {entry.entities_found?.length > 0 && (
+          <div className="log-step__entities">
+            <span className="log-step__entities-label">Entities</span>
+            {entry.entities_found.map(e => (
+              <span key={e} className="log-pill log-pill--entity">{e}</span>
+            ))}
+          </div>
+        )}
+
+        {entry.affected_suppliers?.length > 0 && (
+          <div className="log-step__entities">
+            <span className="log-step__entities-label">Suppliers</span>
+            {entry.affected_suppliers.map(s => (
+              <span key={s} className="log-pill log-pill--entity">{s}</span>
+            ))}
+          </div>
+        )}
+
+        {entry.warehouses_at_risk?.length > 0 && (
+          <div className="log-step__entities">
+            <span className="log-step__entities-label">Warehouses</span>
+            {entry.warehouses_at_risk.map(w => (
+              <span key={w} className="log-pill log-pill--entity">{w}</span>
+            ))}
+          </div>
+        )}
+
+        {entry.anomaly_types?.length > 0 && (
+          <div className="log-step__entities">
+            <span className="log-step__entities-label">Anomalies</span>
+            {entry.anomaly_types.map(t => (
+              <span key={t} className="log-pill log-pill--warn">{t}</span>
+            ))}
+          </div>
+        )}
+
+        {entry.sql_queries?.length > 0 && (
           <details className="log-sql">
-            <summary className="log-sql__toggle">SQL executed</summary>
-            <pre className="log-sql__code">{entry.sql_query}</pre>
+            <summary className="log-sql__toggle">{entry.sql_queries.length} SQL query/queries executed</summary>
+            {entry.sql_queries.map((q, i) => (
+              <pre key={i} className="log-sql__code">{q}</pre>
+            ))}
           </details>
         )}
       </div>

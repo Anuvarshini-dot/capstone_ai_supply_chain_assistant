@@ -19,7 +19,12 @@ If the query asks about NEGATIVE performance (worst, lowest, failing, canceled, 
   1. Answer directly with the low-fulfillment products/regions.
   2. Leave top_fulfillment as an empty list.
 
-Base findings on: product fulfillment rate, order status (COMPLETE vs PENDING vs CANCELED), and cancellation patterns by product or region.
+CRITICAL RULES FOR NUMBERS:
+- If a "SQL Ground Truth" value is provided, you MUST use that exact number for stock/unit totals — never use warehouse capacity_units as a substitute for actual stock held.
+- warehouse capacity_units is the physical maximum the warehouse can hold — it is NOT the current stock level.
+- Only report numeric stock totals from the SQL Ground Truth. For everything else, use the incident data.
+
+Base findings on: product fulfillment rate, order status (COMPLETE vs PENDING vs CANCELED), stockout/critical inventory status, and cancellation patterns by product or region.
 
 Use ONLY product names from the provided orders data — never invent or use placeholder names.
 
@@ -39,7 +44,7 @@ Return ONLY a valid JSON object:
 class InventoryAgent(BaseAgent):
     name = "inventory"
 
-    def analyze(self, query: str, incidents: list = None) -> dict:
+    def analyze(self, query: str, incidents: list = None, sql_answer: str = "", prior_findings: dict = None) -> dict:
         if incidents is None:
             raw = hybrid_search(query, top_k=20)
             # Filter for records with low/critical/stockout inventory status or low days of supply
@@ -51,9 +56,10 @@ class InventoryAgent(BaseAgent):
             incidents = rerank(query, at_risk if at_risk else raw, top_k=5)
 
         incident_text = self._format_incidents(incidents)
+        sql_context = f"\n\nSQL Ground Truth (use these exact numbers for stock totals): {sql_answer}" if sql_answer else ""
         response = self._call_llm(
             SYSTEM,
-            f"Query: {query}\n\nOrders:\n{incident_text}\n\nAnalyze and return JSON."
+            f"Query: {query}\n\nOrders:\n{incident_text}{sql_context}\n\nAnalyze and return JSON."
         )
 
         result = self._parse_json(response, {

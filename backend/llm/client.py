@@ -26,6 +26,18 @@ def chat(messages: list, temperature: float = 0.3, **kwargs) -> str:
     return response.choices[0].message.content
 
 
+def chat_with_tools(messages: list, tools: list, tool_choice="auto", temperature: float = 0.1):
+    """Returns the full message object so callers can inspect tool_calls."""
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        tools=tools,
+        tool_choice=tool_choice,
+        temperature=temperature,
+    )
+    return response.choices[0].message
+
+
 def embed(texts: list) -> list:
     response = client.embeddings.create(
         model=EMBEDDING_MODEL,

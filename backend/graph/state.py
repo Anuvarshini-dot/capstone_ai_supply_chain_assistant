@@ -16,6 +16,7 @@ class SupplyChainState(TypedDict):
     # ── Agent outputs ─────────────────────────────────────────────
     agent_findings:      dict        # keyed by agent name
     sql_result:          Optional[str]
+    sql_data:            Optional[str]   # raw tabular SQL output — used as faithfulness context
     sql_entities:        Optional[dict]  # entities extracted from SQL result for targeted ChromaDB retrieval
 
     # ── Final outputs ─────────────────────────────────────────────
