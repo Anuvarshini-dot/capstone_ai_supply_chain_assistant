@@ -19,6 +19,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from graph.state import SupplyChainState
+from guardrails.input_validator import validate_query, ValidationError
 from agents.base_agent import BaseAgent
 from agents.supplier_risk_agent import SupplierRiskAgent
 from agents.shipment_agent import ShipmentAgent
@@ -29,6 +30,43 @@ from agents.nlsql_agent import NLSQLAgent
 from retrieval.hybrid_search import hybrid_search
 from retrieval.reranker import rerank
 from llm.client import chat
+
+
+# ── Input guardrail ──────────────────────────────────────────────────────────
+
+def input_guardrail_node(state: SupplyChainState) -> dict:
+    """First node in the graph — validates query for length, PII, and format before anything else runs."""
+    t0  = time.time()
+    log = list(state.get("execution_log", []))
+
+    try:
+        validate_query(state["query"])
+        log.append({
+            "step":   "Input Guardrail",
+            "icon":   "🛡️",
+            "detail": "Query passed — length, PII, and format checks OK",
+            "ms":     round((time.time() - t0) * 1000),
+        })
+        return {"validation_passed": True, "execution_log": log}
+
+    except ValidationError as e:
+        log.append({
+            "step":   "Input Guardrail",
+            "icon":   "🛡️",
+            "detail": f"Rejected: {e}",
+            "ms":     round((time.time() - t0) * 1000),
+        })
+        return {
+            "validation_passed": False,
+            "answer":            str(e),
+            "execution_log":     log,
+        }
+
+
+def route_after_guardrail(state: SupplyChainState) -> str:
+    if state.get("validation_passed") is False:
+        return "end"
+    return "general_check_node"
 
 
 # ── General check ────────────────────────────────────────────────────────────

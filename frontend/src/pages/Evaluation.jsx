@@ -5,9 +5,9 @@ import './Evaluation.css'
 const METRIC_META = {
   retrieval_quality:     { label: 'Retrieval Quality',    icon: '🔍', desc: 'Avg hybrid score (semantic + BM25) of retrieved docs, plus how many score above the quality threshold.' },
   context_coverage:      { label: 'Context Coverage',     icon: '🗂️', desc: 'How many distinct entity types (shipment, supplier, warehouse) appear in the retrieved context — broader coverage means richer grounding.' },
-  answer_relevancy:      { label: 'Answer Relevancy',     icon: '🎯', desc: 'Query ↔ Answer: is the answer relevant to both the question and the supply chain risk assessment purpose? Risk context (stockouts, delays, supplier tiers) is expected and not penalised.' },
+  answer_relevancy:      { label: 'Answer Relevancy',     icon: '🎯', desc: 'Domain-aware GEval: does the answer address the query? Comprehensive answers with supplier risk, inventory status, and recommendations are expected and not penalised.' },
   faithfulness:          { label: 'Faithfulness',          icon: '📌', desc: 'Context ↔ Answer: is every claim in the answer supported by the retrieved context? Low score signals hallucination risk.' },
-  contextual_relevancy:  { label: 'Contextual Relevancy', icon: '🔗', desc: 'Query ↔ Context: were the right documents retrieved for this query? Low score means retrieval surfaced irrelevant records.' },
+  contextual_relevancy:  { label: 'Contextual Relevancy', icon: '🔗', desc: 'Domain-aware GEval: is the retrieved context (warehouse profiles, supplier data, SQL results, shipment records) useful for the query?' },
   deepeval_unavailable:  { label: 'DeepEval',             icon: '⚠',  desc: null },
   deepeval_error:        { label: 'DeepEval Error',        icon: '⚠',  desc: null },
 }
@@ -132,14 +132,13 @@ export default function Evaluation() {
       )}
 
       <div className="eval-note">
-        <strong>Answer Relevancy</strong> uses a domain-aware GEval judge that understands risk
-        context (stockouts, delays, supplier tiers) is expected output, not noise.{' '}
-        <strong>Faithfulness</strong> and <strong>Contextual Relevancy</strong> use standard
-        DeepEval LLM judges covering the remaining RAG triangle edges (context↔answer,
-        query↔context).{' '}
-        <strong>Retrieval Quality</strong> and <strong>Context Coverage</strong> are computed
-        directly from document scores and metadata — no LLM required.
-        All metrics update automatically after each new query.
+        <strong>Answer Relevancy</strong> and <strong>Contextual Relevancy</strong> use
+        domain-aware GEval judges that understand comprehensive supply chain answers — risk context,
+        inventory data, and recommendations alongside the direct answer are expected and not penalised.{' '}
+        <strong>Faithfulness</strong> uses a standard DeepEval judge to detect hallucinations.{' '}
+        <strong>Retrieval Quality</strong> and <strong>Context Coverage</strong> are non-LLM metrics
+        computed directly from document scores and metadata.
+        All metrics update automatically after each query.
       </div>
     </div>
   )

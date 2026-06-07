@@ -7,6 +7,9 @@ class SupplyChainState(TypedDict):
     filters:             Optional[dict]
     top_k:               int
 
+    # ── Guardrail ─────────────────────────────────────────────────
+    validation_passed:   Optional[bool]  # set by input_guardrail_node; False short-circuits the graph
+
     # ── Routing ──────────────────────────────────────────────────
     routed_agents:       List[str]   # e.g. ["inventory", "supplier"] — ordered by classifier
     agent_sub_queries:   Optional[dict]  # e.g. {"inventory": "which warehouse...", "supplier": "who supplies LA Hub?"}

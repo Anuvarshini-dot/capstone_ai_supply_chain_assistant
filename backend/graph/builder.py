@@ -3,14 +3,16 @@ Builds and compiles the LangGraph StateGraph for the supply chain query pipeline
 
 Flow:
   START
-    → general_check_node
-        → general_node → END                          (off-topic query)
-        → nlsql_node                                  (all supply-chain queries)
-            → classify_node                           (decide which specialists + execution order)
-                → recommendation_node → END           (SQL answer sufficient, no specialists needed)
-                → retrieve_node                       (specialists needed)
-                    → orchestrator_node               (runs agents in classifier-determined order)
-                        → summary_node → recommendation_node → END
+    → input_guardrail_node
+        → END                                         (invalid query — too short, PII, etc.)
+        → general_check_node
+            → general_node → END                      (off-topic query)
+            → nlsql_node                              (all supply-chain queries)
+                → classify_node                       (decide which specialists + execution order)
+                    → recommendation_node → END       (SQL answer sufficient, no specialists needed)
+                    → retrieve_node                   (specialists needed)
+                        → orchestrator_node           (runs agents in classifier-determined order)
+                            → summary_node → recommendation_node → END
 """
 import os
 import sys
@@ -21,10 +23,10 @@ from langgraph.graph import StateGraph, END, START
 
 from graph.state import SupplyChainState
 from graph.nodes import (
-    general_check_node, classify_node, retrieve_node,
+    input_guardrail_node, general_check_node, classify_node, retrieve_node,
     orchestrator_node, nlsql_node, summary_node,
     recommendation_node, general_node,
-    route_after_general_check, route_after_classify,
+    route_after_guardrail, route_after_general_check, route_after_classify,
 )
 
 
@@ -32,17 +34,28 @@ def build_graph():
     g = StateGraph(SupplyChainState)
 
     # ── Register nodes ────────────────────────────────────────────
-    g.add_node("general_check_node",  general_check_node)
-    g.add_node("nlsql_node",          nlsql_node)
-    g.add_node("classify_node",       classify_node)
-    g.add_node("retrieve_node",       retrieve_node)
-    g.add_node("orchestrator_node",   orchestrator_node)
-    g.add_node("summary_node",        summary_node)
-    g.add_node("recommendation_node", recommendation_node)
-    g.add_node("general_node",        general_node)
+    g.add_node("input_guardrail_node", input_guardrail_node)
+    g.add_node("general_check_node",   general_check_node)
+    g.add_node("nlsql_node",           nlsql_node)
+    g.add_node("classify_node",        classify_node)
+    g.add_node("retrieve_node",        retrieve_node)
+    g.add_node("orchestrator_node",    orchestrator_node)
+    g.add_node("summary_node",         summary_node)
+    g.add_node("recommendation_node",  recommendation_node)
+    g.add_node("general_node",         general_node)
 
     # ── Entry point ───────────────────────────────────────────────
-    g.add_edge(START, "general_check_node")
+    g.add_edge(START, "input_guardrail_node")
+
+    # ── guardrail → END (invalid) or general_check ───────────────
+    g.add_conditional_edges(
+        "input_guardrail_node",
+        route_after_guardrail,
+        {
+            "end":               END,
+            "general_check_node": "general_check_node",
+        }
+    )
 
     # ── general_check → general QA or nlsql ──────────────────────
     g.add_conditional_edges(
