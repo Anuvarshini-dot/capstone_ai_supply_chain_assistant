@@ -40,7 +40,7 @@ def bm25_search(query: str, top_k: int = 20, metadata_filter: dict = None) -> li
 
     tokenized_query = query.lower().split()
     scores = bm25.get_scores(tokenized_query)
-
+    # return a float score for every document in the index 
     ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
 
     hits = []

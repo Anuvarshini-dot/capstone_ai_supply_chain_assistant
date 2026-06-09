@@ -41,6 +41,62 @@ def _retrieval_quality(retrieved_docs: list) -> dict:
     }
 
 
+def _sql_answer_consistency(sql_data: str, answer: str) -> dict:
+    """Non-LLM: checks whether the number SQL returned appears in the final answer."""
+    import re
+    sql_numbers = re.findall(r"\b\d+(?:\.\d+)?\b", sql_data)
+    answer_numbers = re.findall(r"\b\d+(?:\.\d+)?\b", answer)
+    if not sql_numbers:
+        return {
+            "score": 1.0, "passed": True, "threshold": 0.5,
+            "reason": "No numeric values in SQL output — consistency check skipped.",
+            "details": {},
+        }
+    matched = [n for n in sql_numbers[:5] if n in answer_numbers]
+    score   = round(len(matched) / len(sql_numbers[:5]), 3)
+    return {
+        "score":     score,
+        "passed":    score >= 0.5,
+        "threshold": 0.5,
+        "reason": (
+            f"{len(matched)}/{len(sql_numbers[:5])} SQL number(s) found in answer. "
+            f"SQL had: {sql_numbers[:5]}"
+        ),
+        "details": {"sql_numbers": sql_numbers[:5], "matched": matched},
+    }
+
+
+def _zero_result_handling(sql_data: str, answer: str) -> dict:
+    """Non-LLM: when SQL returns 0 or empty rows, checks the answer acknowledges it clearly."""
+    import re
+    has_zero    = bool(re.search(r"\b0\b", sql_data))
+    no_rows     = any(phrase in sql_data.lower() for phrase in ["no rows", "no results", "empty", "[]"])
+    is_zero_result = has_zero or no_rows
+    if not is_zero_result:
+        return {
+            "score": 1.0, "passed": True, "threshold": 0.5,
+            "reason": "SQL returned non-zero results — zero-result check not applicable.",
+            "details": {},
+        }
+    # Answer should surface the zero and ideally explain why
+    answer_lower = answer.lower()
+    mentions_zero  = bool(re.search(r"\b0\b|no\s+(delayed|shipments?|records?|data|results?)", answer_lower))
+    explains_gap   = any(w in answer_lower for w in [
+        "no data", "not available", "outside", "date range", "no records",
+        "period", "time range", "not found", "no shipments",
+    ])
+    if mentions_zero and explains_gap:
+        score, reason = 1.0, "Answer correctly reports zero result and explains the data gap."
+    elif mentions_zero:
+        score, reason = 0.6, "Answer reports zero but does not explain why (e.g., date range gap)."
+    else:
+        score, reason = 0.0, "Answer does not acknowledge that SQL returned zero results."
+    return {
+        "score": score, "passed": score >= 0.5, "threshold": 0.5,
+        "reason": reason, "details": {"sql_returned_zero": True},
+    }
+
+
 def _context_coverage(retrieved_docs: list) -> dict:
     doc_type_counts: dict = {}
     for d in retrieved_docs:
@@ -158,6 +214,44 @@ def _deepeval_pipeline_metrics(query: str, answer: str, retrieved_docs: list, sq
         }
 
 
+# ── Per-agent evaluation ──────────────────────────────────────────────────────
+
+_AGENT_EVAL_FN = {
+    "supplier":  ("evaluation.deepeval.test_supplier_node",  "evaluate_supplier"),
+    "shipment":  ("evaluation.deepeval.test_shipment_node",  "evaluate_shipment"),
+    "inventory": ("evaluation.deepeval.test_inventory_node", "evaluate_inventory"),
+    "nlsql":     ("evaluation.deepeval.test_nlsql_node",     "evaluate_nlsql"),
+}
+
+
+def _agent_evaluations(query: str, agent_findings: dict, agent_sub_queries: dict = None) -> dict:
+    import importlib
+    results = {}
+    sub_queries = agent_sub_queries or {}
+    for agent_name, findings in agent_findings.items():
+        if not findings or agent_name not in _AGENT_EVAL_FN:
+            continue
+        module_path, fn_name = _AGENT_EVAL_FN[agent_name]
+        # Use the agent's focused sub-question for relevance evaluation; fall back to full query
+        sub_query = sub_queries.get(agent_name) or query
+        try:
+            mod = importlib.import_module(module_path)
+            results[agent_name] = getattr(mod, fn_name)(query, findings, sub_query=sub_query)
+        except Exception as exc:
+            results[agent_name] = {"error": {"score": None, "passed": None,
+                                             "threshold": 0, "reason": str(exc)[:200], "details": {}}}
+    return results
+
+
+def _summary_evaluation(query: str, answer: str, agent_findings: dict) -> dict:
+    try:
+        from evaluation.deepeval.test_summary_node import evaluate_summary
+        return evaluate_summary(query, answer, agent_findings)
+    except Exception as exc:
+        fallback = {"score": None, "passed": None, "threshold": 0, "reason": str(exc)[:200], "details": {}}
+        return {"answer_relevancy": fallback, "answer_completeness": fallback, "conciseness": fallback}
+
+
 # ── Main evaluation function ──────────────────────────────────────────────────
 
 def evaluate_query(
@@ -165,10 +259,13 @@ def evaluate_query(
     answer: str,
     retrieved_docs: list,
     sql_data: str = "",
+    agent_findings: dict = None,
+    agent_sub_queries: dict = None,
 ) -> dict:
     """
-    Run the five evaluation metrics for a single query / answer / context triple.
-    Returns a flat dict where every value is a {score, passed, threshold, reason, details} metric.
+    Run pipeline + per-agent evaluation metrics.
+    Returns a dict with pipeline metrics at the top level and
+    agent_evaluations / summary_evaluation nested keys.
     """
     results: dict = {}
 
@@ -176,7 +273,19 @@ def evaluate_query(
         results["retrieval_quality"] = _retrieval_quality(retrieved_docs)
         results["context_coverage"]  = _context_coverage(retrieved_docs)
 
+    # SQL consistency checks — run whenever SQL was executed
+    if sql_data:
+        results["sql_answer_consistency"] = _sql_answer_consistency(sql_data, answer)
+        results["zero_result_handling"]   = _zero_result_handling(sql_data, answer)
+
     pipeline = _deepeval_pipeline_metrics(query, answer, retrieved_docs, sql_data=sql_data)
     results.update(pipeline)
+
+    if agent_findings:
+        agent_evals = _agent_evaluations(query, agent_findings, agent_sub_queries)
+        if agent_evals:
+            results["agent_evaluations"] = agent_evals
+
+        results["summary_evaluation"] = _summary_evaluation(query, answer, agent_findings)
 
     return results

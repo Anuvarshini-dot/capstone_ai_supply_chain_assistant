@@ -62,7 +62,12 @@ class NLSQLAgent:
                 df   = pd.read_sql_query(sql, conn)
                 conn.close()
                 collected_dfs.append(df)
-                return df.to_string(index=False) if not df.empty else "No results found."
+                if df.empty:
+                    return "No results found."
+                preview = df.head(25).to_string(index=False)
+                if len(df) > 25:
+                    preview += f"\n... ({len(df) - 25} more rows — showing top 25)"
+                return preview
             except Exception as e:
                 return f"SQL error: {e}"
 
@@ -90,8 +95,11 @@ class NLSQLAgent:
             {"role": "user", "content": query},
         ]
 
-        for _ in range(5):
-            response = chat(messages)
+        for _ in range(3):
+            try:
+                response = chat(messages)
+            except Exception:
+                break
             messages.append({"role": "assistant", "content": response})
 
             sql = _extract_sql(response)
@@ -106,10 +114,10 @@ class NLSQLAgent:
 
         # ── Generate final answer from collected data ─────────────────────
         if collected_dfs:
-            data_str = "\n\n".join(df.to_string(index=False) for df in collected_dfs)
+            data_str = "\n\n".join(df.head(25).to_string(index=False) for df in collected_dfs)
             answer = chat([
                 {"role": "system", "content": "Answer the question using only the provided SQL data. Be concise and factual. Use actual names and numbers — never IDs alone."},
-                {"role": "user",   "content": f"Question: {query}\n\nData:\n{data_str}"},
+                {"role": "user",   "content": f"Question: {query}\n\nData:\n{data_str[:3000]}"},
             ])
         else:
             answer = "No data could be retrieved from the database."

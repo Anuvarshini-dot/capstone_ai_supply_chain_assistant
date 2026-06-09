@@ -14,11 +14,9 @@ class SupplyChainState(TypedDict):
     routed_agents:       List[str]   # e.g. ["inventory", "supplier"] — ordered by classifier
     agent_sub_queries:   Optional[dict]  # e.g. {"inventory": "which warehouse...", "supplier": "who supplies LA Hub?"}
 
-    # ── Retrieval ─────────────────────────────────────────────────
-    retrieved_incidents: List[dict]
-
     # ── Agent outputs ─────────────────────────────────────────────
     agent_findings:      dict        # keyed by agent name
+    retrieved_incidents: List[dict]  # collected from all agent findings
     sql_result:          Optional[str]
     sql_data:            Optional[str]   # raw tabular SQL output — used as faithfulness context
     sql_entities:        Optional[dict]  # entities extracted from SQL result for targeted ChromaDB retrieval

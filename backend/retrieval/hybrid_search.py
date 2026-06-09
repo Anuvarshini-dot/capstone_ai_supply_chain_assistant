@@ -32,7 +32,7 @@ def hybrid_search(query: str, top_k: int = 5, filters: dict = None) -> list:
 
     semantic_hits = semantic_search(query_embedding, top_k=RERANK_TOP_N, where=chroma_where)
     bm25_hits = bm25_search(query, top_k=RERANK_TOP_N, metadata_filter=filters)
-
+    # normalise the BM25 scores to 0-1 range based on the max score in the current hits
     raw_bm25 = {h["id"]: h["bm25_score"] for h in bm25_hits}
     max_bm25 = max(raw_bm25.values(), default=1) or 1
     norm_bm25 = {k: v / max_bm25 for k, v in raw_bm25.items()}

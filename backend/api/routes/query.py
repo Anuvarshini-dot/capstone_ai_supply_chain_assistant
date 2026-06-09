@@ -21,7 +21,7 @@ async def query_endpoint(request: QueryRequest):
         "validation_passed":   None,
         "routed_agents":       [],
         "agent_sub_queries":   None,
-        "retrieved_incidents": [],
+        "retrieved_incidents": [],  # populated by orchestrator_node
         "agent_findings":      {},
         "sql_result":          None,
         "sql_data":            None,
@@ -42,6 +42,8 @@ async def query_endpoint(request: QueryRequest):
             answer=result.get("answer", ""),
             retrieved_docs=result.get("retrieved_incidents", []),
             sql_data=result.get("sql_data", ""),
+            agent_findings=result.get("agent_findings", {}),
+            agent_sub_queries=result.get("agent_sub_queries", {}),
         )
 
         return result

@@ -5,14 +5,16 @@ Each node receives the full state, does its work, and returns a partial state up
 Execution order:
   general_check_node → (general) → general_node → END
   general_check_node → (supply chain) → nlsql_node → classify_node
-    → (specialists) → retrieve_node → orchestrator_node → summary_node → recommendation_node → END
+    → (specialists) → orchestrator_node → summary_node → recommendation_node → END
     → (no specialists) → recommendation_node → END
 
 The orchestrator_node runs specialist agents in the order chosen by classify_node,
+each agent fetches its own targeted docs via _targeted_docs(),
 passing accumulated findings from earlier agents into later ones.
 """
 import json
 import os
+import re
 import sys
 import time
 
@@ -139,10 +141,32 @@ Rules:
   Use exact entity names from SQL context (e.g. "Los Angeles Fulfillment Hub") in sub-queries.
 - Ordering: put the most data-rich agent for this query FIRST.
   warehouse/stock focus → inventory first; supplier/risk focus → supplier first; delays → shipment first.
-- Return [] if the SQL answer alone is sufficient and no specialist adds value.
+
+IMPORTANT — Return [] (no specialists) when:
+- The query asks for a COUNT, TOTAL, AVERAGE, or any aggregate number (e.g. "how many", "what is the total", "average delay", "number of shipments").
+- The query is answered by a single SQL metric — no analysis, risk assessment, or pattern detection is needed.
+- Examples that need NO specialists: "How many shipments were delayed last month?", "What is the average delivery time?", "How many orders were cancelled?"
+- Examples that DO need specialists: "Why are shipments delayed?", "Which suppliers are at risk?", "What is causing the stockout?"
 
 Return ONLY valid JSON:
 {"agents": [{"name": "inventory", "sub_query": "which warehouse has the highest stock?"}, {"name": "supplier", "sub_query": "who is the highest contributing supplier to Los Angeles Fulfillment Hub?"}]}"""
+
+
+_AGGREGATE_RE = re.compile(
+    r"\b(how many|how much|what is the (total|count|number|average|avg|sum)|"
+    r"total number of|count of|number of|how often|what('s| is) the (total|count|average|avg))\b",
+    re.IGNORECASE,
+)
+
+_ANALYSIS_RE = re.compile(
+    r"\b(why|which|who|analyze|analyse|risk|cause|reason|pattern|recommend|should|impact|affect)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_sql_sufficient(query: str) -> bool:
+    """Return True when the query is a pure count/aggregate — no specialist analysis needed."""
+    return bool(_AGGREGATE_RE.search(query)) and not bool(_ANALYSIS_RE.search(query))
 
 
 def classify_node(state: SupplyChainState) -> dict:
@@ -150,6 +174,17 @@ def classify_node(state: SupplyChainState) -> dict:
     t0           = time.time()
     query        = state["query"]
     sql_entities = state.get("sql_entities") or {}
+
+    if _is_sql_sufficient(query):
+        log = state.get("execution_log", [])
+        log.append({
+            "step":   "Specialist Classification",
+            "icon":   "🎯",
+            "detail": "SQL answer sufficient — no specialists needed",
+            "agents": [],
+            "ms":     round((time.time() - t0) * 1000),
+        })
+        return {"routed_agents": [], "agent_sub_queries": {}, "execution_log": log}
 
     # Build entity context for the classifier
     entity_lines = []
@@ -176,12 +211,13 @@ def classify_node(state: SupplyChainState) -> dict:
         for item in parsed.get("agents", []):
             if isinstance(item, dict) and item.get("name") in valid:
                 name = item["name"]
-                agents.append(name)
-                sub_queries[name] = item.get("sub_query") or query
+                if name not in sub_queries:  # deduplicate
+                    agents.append(name)
+                    sub_queries[name] = item.get("sub_query") or query
             elif isinstance(item, str) and item in valid:
-                # Fallback: plain string list (old format)
-                agents.append(item)
-                sub_queries[item] = query
+                if item not in sub_queries:  # deduplicate
+                    agents.append(item)
+                    sub_queries[item] = query
     except Exception:
         # Keyword fallback — one agent, full query
         q = query.lower()
@@ -205,81 +241,6 @@ def classify_node(state: SupplyChainState) -> dict:
     return {"routed_agents": agents, "agent_sub_queries": sub_queries, "execution_log": log}
 
 
-# ── Retrieval ────────────────────────────────────────────────────────────────
-
-def retrieve_node(state: SupplyChainState) -> dict:
-    t0    = time.time()
-    query = state["query"]
-
-    sql_entities    = state.get("sql_entities") or {}
-    supplier_names  = sql_entities.get("supplier_names",  [])
-    warehouse_names = sql_entities.get("warehouse_names", [])
-    all_entity_names = supplier_names + warehouse_names
-
-    retrieval_query = f"{query} {' '.join(all_entity_names[:4])}" if all_entity_names else query
-    user_filters    = state.get("filters") or {}
-    target_k        = state.get("top_k", 5)
-
-    # ── Step 1: Fetch pre-aggregated profile docs for SQL-identified entities ──
-    # Profiles contain delay rates, avg/max delay, inventory impact — better than
-    # individual shipment events for supplier/warehouse performance questions.
-    profile_docs: list = []
-    if supplier_names:
-        profile_filter = {"doc_type": "supplier_profile", "supplier_name": supplier_names}
-        profile_docs = hybrid_search(query, top_k=min(len(supplier_names), 8),
-                                     filters=profile_filter)
-    elif warehouse_names:
-        profile_filter = {"doc_type": "warehouse_profile", "warehouse_name": warehouse_names}
-        profile_docs = hybrid_search(query, top_k=min(len(warehouse_names), 5),
-                                     filters=profile_filter)
-
-    # ── Step 2: Fetch shipment event docs for incident-level context ───────────
-    entity_filter: dict = {}
-    if supplier_names:
-        entity_filter["supplier_name"] = supplier_names
-    elif warehouse_names:
-        entity_filter["warehouse_name"] = warehouse_names
-
-    combined_filters = {**entity_filter, **user_filters} if entity_filter else user_filters or None
-    shipment_docs = hybrid_search(retrieval_query, top_k=15, filters=combined_filters)
-
-    # Fallback: if entity filter was too restrictive, relax to user filters only
-    if len(shipment_docs) < 2 and entity_filter:
-        shipment_docs = hybrid_search(retrieval_query, top_k=15, filters=user_filters or None)
-
-    # ── Step 3: Combine — profiles guaranteed first, shipments fill remaining ──
-    seen: set = set()
-    combined: list = []
-    for doc in profile_docs:
-        if doc["id"] not in seen:
-            seen.add(doc["id"])
-            combined.append(doc)
-
-    remaining = max(target_k - len(combined), 2)
-    for doc in rerank(query, shipment_docs, top_k=remaining):
-        if doc["id"] not in seen:
-            seen.add(doc["id"])
-            combined.append(doc)
-
-    profile_count  = sum(1 for d in combined
-                         if d.get("metadata", {}).get("doc_type")
-                         in ("supplier_profile", "warehouse_profile"))
-    shipment_count = len(combined) - profile_count
-    entity_note    = f" (SQL-targeted: {', '.join(all_entity_names[:3])})" if all_entity_names else ""
-
-    log = state.get("execution_log", [])
-    log.append({
-        "step":           "Vector Retrieval",
-        "icon":           "🗄️",
-        "detail":         f"{profile_count} profiles + {shipment_count} shipments retrieved{entity_note}",
-        "docs_retrieved": len(combined),
-        "profile_count":  profile_count,
-        "shipment_count": shipment_count,
-        "ms":             round((time.time() - t0) * 1000),
-    })
-    return {"retrieved_incidents": combined, "execution_log": log}
-
-
 # ── Orchestrator node ─────────────────────────────────────────────────────────
 
 _AGENT_META = {
@@ -289,8 +250,9 @@ _AGENT_META = {
 }
 
 
-def _targeted_docs(agent_name: str, state: dict, base_docs: list) -> list:
-    """Return docs targeted to this agent's role — profiles first, shipments to fill remaining slots."""
+def _targeted_docs(agent_name: str, state: dict) -> list:
+    """Fetch docs targeted to this agent's role — profiles first, shipments to fill remaining slots.
+    Falls back to an unfiltered search if targeted retrieval finds fewer than 2 docs."""
     sub_query       = (state.get("agent_sub_queries") or {}).get(agent_name) or state["query"]
     sql_entities    = state.get("sql_entities") or {}
     supplier_names  = sql_entities.get("supplier_names", [])
@@ -300,33 +262,28 @@ def _targeted_docs(agent_name: str, state: dict, base_docs: list) -> list:
     shipment_docs: list = []
 
     if agent_name == "supplier":
-        # 1. Supplier profiles — aggregated reliability, risk, lead time
         if supplier_names:
             profile_docs = hybrid_search(sub_query, top_k=min(len(supplier_names) + 2, 6),
                                          filters={"doc_type": "supplier_profile", "supplier_name": supplier_names})
         else:
             profile_docs = hybrid_search(sub_query, top_k=4, filters={"doc_type": "supplier_profile"})
 
-        # 2. Shipment events filtered to the identified warehouse (if any) for contribution data
         if warehouse_names:
             shipment_docs = hybrid_search(sub_query, top_k=10, filters={"warehouse_name": warehouse_names})
         elif supplier_names:
             shipment_docs = hybrid_search(sub_query, top_k=10, filters={"supplier_name": supplier_names})
 
     elif agent_name == "inventory":
-        # 1. Warehouse profiles — capacity, utilisation, region
         if warehouse_names:
             profile_docs = hybrid_search(sub_query, top_k=min(len(warehouse_names) + 2, 6),
                                          filters={"doc_type": "warehouse_profile", "warehouse_name": warehouse_names})
         else:
             profile_docs = hybrid_search(sub_query, top_k=4, filters={"doc_type": "warehouse_profile"})
 
-        # 2. Inventory/shipment events for that warehouse
         if warehouse_names:
             shipment_docs = hybrid_search(sub_query, top_k=10, filters={"warehouse_name": warehouse_names})
 
     elif agent_name == "shipment":
-        # Shipment events: warehouse-targeted if available, else supplier-targeted
         if warehouse_names:
             shipment_docs = hybrid_search(sub_query, top_k=15, filters={"warehouse_name": warehouse_names})
         elif supplier_names:
@@ -345,7 +302,11 @@ def _targeted_docs(agent_name: str, state: dict, base_docs: list) -> list:
             seen.add(doc["id"])
             combined.append(doc)
 
-    return combined if len(combined) >= 2 else base_docs
+    # Inline fallback — unfiltered search if targeted retrieval found too few docs
+    if len(combined) < 2:
+        combined = hybrid_search(sub_query, top_k=5)
+
+    return combined
 
 
 def _run_agent(name: str, sub_query: str, state: dict, findings_so_far: dict, docs: list) -> dict:
@@ -392,13 +353,19 @@ def orchestrator_node(state: SupplyChainState) -> dict:
     })
     header_idx = len(log) - 1
 
-    base_docs = state["retrieved_incidents"]
-
     for agent_name in ordered:
         t0        = time.time()
         sub_query = sub_queries.get(agent_name) or state["query"]
-        docs      = _targeted_docs(agent_name, state, base_docs)
-        result    = _run_agent(agent_name, sub_query, state, findings, docs)
+        try:
+            docs   = _targeted_docs(agent_name, state)
+            result = _run_agent(agent_name, sub_query, state, findings, docs)
+        except Exception as exc:
+            result = {
+                "summary":    f"Agent unavailable: {str(exc)[:120]}",
+                "risk_level": "unknown",
+                "confidence": 0.0,
+                "findings":   [],
+            }
         findings[agent_name] = result
 
         top_finding = result.get("findings", [None])[0]
@@ -425,7 +392,11 @@ def orchestrator_node(state: SupplyChainState) -> dict:
 
     log[header_idx]["ms"] = round((time.time() - t_total) * 1000)
 
-    return {"agent_findings": findings, "execution_log": log}
+    all_incidents = []
+    for agent_result in findings.values():
+        all_incidents.extend(agent_result.get("retrieved_incidents", []))
+
+    return {"agent_findings": findings, "retrieved_incidents": all_incidents, "execution_log": log}
 
 
 # ── NL-to-SQL node ───────────────────────────────────────────────────────────
@@ -593,5 +564,5 @@ def route_after_general_check(state: SupplyChainState) -> str:
 
 def route_after_classify(state: SupplyChainState) -> str:
     if any(a in state["routed_agents"] for a in _SC_AGENTS):
-        return "retrieve_node"
+        return "orchestrator_node"
     return "recommendation_node"
