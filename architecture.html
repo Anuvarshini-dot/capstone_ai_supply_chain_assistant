@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Supply Chain Assistant — Architecture</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#eef2ff;--surface:#fff;--surface2:#f8faff;--border:#dde3f5;--border2:#bac4e0;
+  --text:#1a2340;--muted:#55688a;--dim:#8899bb;
+  --primary:#4f46e5;--primary-bg:#eef2ff;--primary-b:#c7d2fe;
+  --red:#dc2626;--red-bg:#fff1f1;--red-b:#fecaca;
+  --amber:#b45309;--amber-bg:#fffbeb;--amber-b:#fde68a;
+  --blue:#1d4ed8;--blue-bg:#eff6ff;--blue-b:#bfdbfe;
+  --purple:#7c3aed;--purple-bg:#f5f3ff;--purple-b:#ddd6fe;
+  --green:#065f46;--green-bg:#ecfdf5;--green-b:#6ee7b7;
+  --cyan:#0e7490;--cyan-bg:#ecfeff;--cyan-b:#a5f3fc;
+  --gray-bg:#f8fafc;--gray-b:#e2e8f0;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.5}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;padding:24px 48px;display:flex;align-items:center;justify-content:space-between}
+.hero h1{font-size:20px;font-weight:800;margin-bottom:3px}
+.hero p{font-size:13px;opacity:.85;max-width:560px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600}
+
+/* LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 80px)}
+.flow-area{flex:1;padding:36px 24px;overflow-x:auto;transition:margin-right .3s}
+.flow-area.shifted{margin-right:420px}
+
+/* ── FLOW GRID (3-column) ── */
+.flow-wrap{display:flex;flex-direction:column;align-items:center;gap:0}
+.frow{display:grid;grid-template-columns:260px 260px 260px;width:780px;align-items:center}
+.fconn{display:grid;grid-template-columns:260px 260px 260px;width:780px;height:30px;align-items:center}
+.fl{display:flex;justify-content:flex-end;align-items:center}
+.fc{display:flex;justify-content:center;align-items:center}
+.fr2{display:flex;justify-content:flex-start;align-items:center}
+
+/* NODE BUTTONS */
+.nb{
+  width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+  padding:12px 16px;border-radius:10px;border:2px solid;cursor:pointer;
+  transition:transform .15s,box-shadow .15s;text-align:left;
+  font-family:inherit;background:var(--surface);
+}
+.nb:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(79,70,229,.18)}
+.nb.active{box-shadow:0 0 0 3px var(--primary);transform:translateY(-2px)}
+.n-ico{font-size:18px;margin-bottom:2px}
+.n-nm{font-size:13px;font-weight:800;line-height:1.2}
+.n-ds{font-size:10px;opacity:.65;line-height:1.3}
+.n-tg{display:inline-block;margin-top:5px;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+
+/* NODE COLOURS */
+.nc-guard{border-color:var(--red-b);background:var(--red-bg);color:var(--red)}
+.nc-route{border-color:var(--amber-b);background:var(--amber-bg);color:var(--amber)}
+.nc-sql  {border-color:var(--blue-b);background:var(--blue-bg);color:var(--blue)}
+.nc-class{border-color:var(--purple-b);background:var(--purple-bg);color:var(--purple)}
+.nc-orch {border-color:var(--primary-b);background:var(--primary-bg);color:var(--primary)}
+.nc-ret  {border-color:var(--cyan-b);background:var(--cyan-bg);color:var(--cyan)}
+.nc-agent{border-color:var(--primary-b);background:#f0f1ff;color:var(--primary)}
+.nc-sum  {border-color:var(--green-b);background:var(--green-bg);color:var(--green)}
+.nc-rec  {border-color:var(--green-b);background:#f0fdf8;color:var(--green)}
+.nc-gen  {border-color:var(--gray-b);background:var(--gray-bg);color:#475569}
+
+/* TERMINAL CAPS */
+.term{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 16px;border-radius:8px;border:2px solid;font-size:12px;font-weight:800;white-space:nowrap}
+.t-start{background:var(--primary);border-color:var(--primary);color:#fff;cursor:default}
+.t-end  {background:var(--gray-bg);border-color:var(--gray-b);color:#64748b;cursor:default}
+.t-fail {background:var(--red-bg);border-color:var(--red-b);color:var(--red);cursor:default;font-size:11px;padding:5px 10px}
+
+/* ARROWS */
+.av{width:2px;height:28px;margin:0 auto;background:linear-gradient(to bottom,var(--border2),var(--primary-b));position:relative;flex-shrink:0}
+.av::after{content:'';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--primary-b)}
+.ah{height:2px;min-width:16px;background:var(--border2);position:relative;flex-shrink:0}
+.ah::after{content:'';position:absolute;right:-5px;top:50%;transform:translateY(-50%);border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:7px solid var(--border2)}
+.ah-l{height:2px;min-width:16px;background:var(--border2);position:relative;flex-shrink:0}
+.ah-l::after{content:'';position:absolute;left:-5px;top:50%;transform:translateY(-50%);border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:7px solid var(--border2)}
+.bl{font-size:9px;color:var(--dim);font-weight:800;letter-spacing:.07em;text-transform:uppercase;background:var(--surface);border:1px solid var(--border);padding:1px 6px;border-radius:4px;white-space:nowrap;margin:0 5px}
+
+/* LOOP BOX */
+.loop-outer{width:780px;display:flex;justify-content:center}
+.loop-box{background:#fff;border:2px dashed var(--primary-b);border-radius:14px;padding:20px 24px;width:100%;display:flex;flex-direction:column;align-items:center;gap:0}
+.loop-lbl{font-size:10px;color:var(--primary);font-weight:800;letter-spacing:.1em;text-transform:uppercase;background:var(--primary-bg);border:1px solid var(--primary-b);padding:3px 14px;border-radius:20px;margin-bottom:14px}
+.agent-trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;width:100%}
+.agent-trio .nb{min-width:0}
+
+/* PANEL */
+.panel{position:fixed;right:0;top:0;bottom:0;width:420px;background:var(--surface);border-left:1px solid var(--border);box-shadow:-4px 0 24px rgba(0,0,0,.1);overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:100}
+.panel.open{transform:translateX(0)}
+.p-bar{height:5px;width:100%}
+.p-head{padding:18px 22px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1}
+.p-close{float:right;background:none;border:1px solid var(--border);cursor:pointer;font-size:14px;color:var(--muted);padding:3px 8px;border-radius:6px;line-height:1;transition:background .15s}
+.p-close:hover{background:var(--bg)}
+.p-ico{font-size:26px;margin-bottom:6px}
+.p-title{font-size:17px;font-weight:800;color:var(--text)}
+.p-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.p-body{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+
+/* Panel sections */
+.ps{display:flex;flex-direction:column;gap:8px}
+.ps-h{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);padding-bottom:6px;border-bottom:1px solid var(--border)}
+.ps p{font-size:13px;color:var(--muted);line-height:1.65}
+.p-summary{background:var(--primary-bg);border:1px solid var(--primary-b);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--primary);font-weight:600;line-height:1.5}
+
+/* IO boxes */
+.io-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.io-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px}
+.io-box.full{grid-column:1/-1}
+.io-h{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.io-h.in-h{color:var(--blue)}
+.io-h.out-h{color:var(--green)}
+.io-h.step-h{color:var(--purple)}
+.field-row{display:flex;gap:6px;margin-bottom:5px;align-items:flex-start}
+.field-name{font-family:'Courier New',monospace;font-size:11px;color:var(--cyan);font-weight:700;background:var(--cyan-bg);border:1px solid var(--cyan-b);padding:1px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.field-desc{font-size:11px;color:var(--muted);line-height:1.4}
+.step-li{display:flex;gap:7px;margin-bottom:5px;align-items:flex-start}
+.step-n{width:18px;height:18px;border-radius:50%;background:var(--purple-bg);border:1px solid var(--purple-b);color:var(--purple);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-t{font-size:12px;color:var(--muted);line-height:1.4}
+.note-box{background:var(--amber-bg);border:1px solid var(--amber-b);border-radius:7px;padding:10px 12px;font-size:12px;color:var(--amber);line-height:1.5}
+.file-box{background:var(--gray-bg);border:1px solid var(--gray-b);border-radius:7px;padding:9px 12px;font-family:'Courier New',monospace;font-size:11px;color:var(--muted)}
+
+/* Section hint */
+.hint{display:inline-flex;align-items:center;gap:7px;background:var(--primary-bg);border:1px solid var(--primary-b);color:var(--primary);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:24px}
+.sec-h{margin-bottom:20px}
+.sec-h h2{font-size:20px;font-weight:800;margin-bottom:3px}
+.sec-h p{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div>
+    <h1>🤖 AI Supply Chain Assistant — System Architecture</h1>
+    <p>Multi-agent LangGraph pipeline: NL-to-SQL → hybrid retrieval → sequential specialist agents → synthesis</p>
+    <div class="chips">
+      <span class="chip">FastAPI</span><span class="chip">LangGraph</span><span class="chip">ChromaDB</span>
+      <span class="chip">BM25</span><span class="chip">GPT-4o</span><span class="chip">React</span><span class="chip">PostgreSQL</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+<div class="flow-area" id="flowArea">
+  <div class="sec-h">
+    <h2>Query Pipeline — LangGraph Graph</h2>
+    <p>Every user query travels through this sequence of nodes. Each node reads from shared state, does its work, and writes back partial updates.</p>
+  </div>
+  <div class="hint">👆 Click any coloured node to see exactly what happens inside it</div>
+
+  <div class="flow-wrap">
+
+    <!-- START -->
+    <div class="frow">
+      <div class="fl"></div>
+      <div class="fc"><div class="term t-start">▶&nbsp; START</div></div>
+      <div class="fr2"></div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- INPUT GUARDRAIL -->
+    <div class="frow">
+      <div class="fl"></div>
+      <div class="fc">
+        <button class="nb nc-guard" onclick="show('guardrail',this)">
+          <span class="n-ico">🛡️</span>
+          <span class="n-nm">Input Guardrail Node</span>
+          <span class="n-ds">Validates length, PII, and format before any LLM call</span>
+          <span class="n-tg" style="background:#fecaca;color:#991b1b">Blocks bad input immediately</span>
+        </button>
+      </div>
+      <div class="fr2" style="padding-left:4px">
+        <div class="ah" style="min-width:12px"></div>
+        <span class="bl">fail</span>
+        <div class="ah" style="min-width:8px"></div>
+        <div class="term t-fail">❌ END</div>
+      </div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- GENERAL CHECK -->
+    <div class="frow">
+      <div class="fl"></div>
+      <div class="fc">
+        <button class="nb nc-route" onclick="show('generalcheck',this)">
+          <span class="n-ico">🔍</span>
+          <span class="n-nm">General Check Node</span>
+          <span class="n-ds">Supply chain vs off-topic — LLM + keyword safety net</span>
+          <span class="n-tg" style="background:#fde68a;color:#92400e">Routes before any data work</span>
+        </button>
+      </div>
+      <div class="fr2" style="padding-left:4px">
+        <div class="ah" style="min-width:12px"></div>
+        <span class="bl">off-topic</span>
+        <div class="ah" style="min-width:6px"></div>
+        <button class="nb nc-gen" onclick="show('general',this)" style="width:148px;min-width:148px;padding:10px 12px;flex-shrink:0">
+          <span class="n-ico">💬</span>
+          <span class="n-nm">General Node</span>
+          <span class="n-ds">Direct LLM answer for off-topic queries</span>
+        </button>
+        <div class="ah" style="min-width:6px"></div>
+        <div class="term t-end" style="padding:5px 8px;font-size:11px">END</div>
+      </div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- NL→SQL -->
+    <div class="frow">
+      <div class="fl"></div>
+      <div class="fc">
+        <button class="nb nc-sql" onclick="show('nlsql',this)">
+          <span class="n-ico">🗃️</span>
+          <span class="n-nm">NL → SQL Agent</span>
+          <span class="n-ds">Converts query to SQL, executes, extracts supplier/warehouse entity names</span>
+          <span class="n-tg" style="background:#bfdbfe;color:#1e40af">Runs on all supply chain queries</span>
+        </button>
+      </div>
+      <div class="fr2"></div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- CLASSIFY -->
+    <div class="frow">
+      <div class="fl" style="padding-right:6px;gap:0;flex-wrap:nowrap">
+        <div class="term t-end" style="padding:6px 10px;font-size:11px;flex-shrink:0">END</div>
+        <div class="ah-l" style="min-width:8px;flex-shrink:0"></div>
+        <button class="nb nc-rec" onclick="show('recommendation',this)" style="width:150px;min-width:150px;padding:10px 12px;flex-shrink:0">
+          <span class="n-ico">💡</span>
+          <span class="n-nm">Recommendation Node</span>
+          <span class="n-ds">SQL answer is sufficient — no specialists needed</span>
+        </button>
+        <div class="ah-l" style="min-width:8px;flex-shrink:0"></div>
+        <span class="bl" style="flex-shrink:0">sql sufficient</span>
+        <div class="ah-l" style="min-width:10px;flex-shrink:0"></div>
+      </div>
+      <div class="fc">
+        <button class="nb nc-class" onclick="show('classify',this)">
+          <span class="n-ico">🎯</span>
+          <span class="n-nm">Classify Node</span>
+          <span class="n-ds">Picks specialists, sets run order, writes a focused sub-question for each agent</span>
+          <span class="n-tg" style="background:#ddd6fe;color:#5b21b6">Uses SQL entity names for routing</span>
+        </button>
+      </div>
+      <div class="fr2"></div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- ORCHESTRATOR -->
+    <div class="frow">
+      <div class="fl"></div>
+      <div class="fc">
+        <button class="nb nc-orch" onclick="show('orchestrator',this)">
+          <span class="n-ico">🎛️</span>
+          <span class="n-nm">Orchestrator Node</span>
+          <span class="n-ds">Runs each specialist in order — findings accumulate so each agent sees the previous ones' results</span>
+          <span class="n-tg" style="background:#c7d2fe;color:#3730a3">Sequential, findings-aware execution</span>
+        </button>
+      </div>
+      <div class="fr2"></div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- LOOP BOX -->
+    <div class="loop-outer">
+      <div class="loop-box">
+        <div class="loop-lbl">🔁 Repeats for each specialist in the queue</div>
+
+        <button class="nb nc-ret" onclick="show('retrieval',this)" style="width:100%">
+          <span class="n-ico">🗄️</span>
+          <span class="n-nm">Targeted Retrieval — _targeted_docs()</span>
+          <span class="n-ds">Per-agent hybrid search (BM25 + ChromaDB semantic) filtered by the agent's role and SQL entity names. Profile docs guaranteed first; shipment events fill remaining slots. Inline fallback if &lt;2 docs found.</span>
+        </button>
+        <div class="av" style="height:20px"></div>
+
+        <div class="agent-trio">
+          <button class="nb nc-agent" onclick="show('supplier',this)" style="text-align:center;align-items:center">
+            <span class="n-ico">🏭</span>
+            <span class="n-nm">Supplier Risk Agent</span>
+            <span class="n-ds">Reliability, defects, delay rates, risk tier</span>
+          </button>
+          <button class="nb nc-agent" onclick="show('shipment',this)" style="text-align:center;align-items:center">
+            <span class="n-ico">🚢</span>
+            <span class="n-nm">Shipment Agent</span>
+            <span class="n-ds">Routes, carriers, delays, regional risk</span>
+          </button>
+          <button class="nb nc-agent" onclick="show('inventory',this)" style="text-align:center;align-items:center">
+            <span class="n-ico">📦</span>
+            <span class="n-nm">Inventory Agent</span>
+            <span class="n-ds">Stock levels, stockouts, warehouse health</span>
+          </button>
+        </div>
+        <div style="font-size:10px;color:var(--dim);margin-top:8px">One agent runs per iteration — determined by classify_node order</div>
+      </div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- SUMMARY -->
+    <div class="frow">
+      <div class="fl"></div>
+      <div class="fc">
+        <button class="nb nc-sum" onclick="show('summary',this)">
+          <span class="n-ico">✦</span>
+          <span class="n-nm">Summary Node</span>
+          <span class="n-ds">Synthesizes all agent findings, detects cross-agent anomaly correlations, computes overall confidence score</span>
+          <span class="n-tg" style="background:#a7f3d0;color:#065f46">Cross-agent risk detection</span>
+        </button>
+      </div>
+      <div class="fr2"></div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- RECOMMENDATION -->
+    <div class="frow">
+      <div class="fl"></div>
+      <div class="fc">
+        <button class="nb nc-rec" onclick="show('recommendation',this)">
+          <span class="n-ico">💡</span>
+          <span class="n-nm">Recommendation Node</span>
+          <span class="n-ds">Generates prioritized, actionable recommendations from all combined findings</span>
+          <span class="n-tg" style="background:#a7f3d0;color:#065f46">Final node before END</span>
+        </button>
+      </div>
+      <div class="fr2"></div>
+    </div>
+    <div class="fconn"><div class="fl"></div><div class="fc"><div class="av"></div></div><div class="fr2"></div></div>
+
+    <!-- END -->
+    <div class="frow">
+      <div class="fl"></div>
+      <div class="fc"><div class="term t-end">⏹&nbsp; END</div></div>
+      <div class="fr2"></div>
+    </div>
+
+  </div><!-- /flow-wrap -->
+</div><!-- /flow-area -->
+
+<!-- DETAIL PANEL -->
+<div class="panel" id="panel">
+  <div class="p-bar" id="pBar"></div>
+  <div class="p-head">
+    <button class="p-close" onclick="closePanel()">✕</button>
+    <div class="p-ico" id="pIco"></div>
+    <div class="p-title" id="pTitle"></div>
+    <div class="p-sub" id="pSub"></div>
+  </div>
+  <div class="p-body" id="pBody"></div>
+</div>
+</div>
+
+<script>
+const D = {
+  guardrail:{
+    ico:'🛡️',title:'Input Guardrail Node',sub:'Runs first — validates before any LLM call',color:'#dc2626',
+    summary:'Checks the incoming query for length, PII, and format issues. If anything fails, the graph ends immediately — zero tokens spent.',
+    reads:[['query','str','The raw user input']],
+    steps:['Reject if query length is below minimum or above maximum','Scan for PII patterns: email addresses, phone numbers','Validate that input is a proper natural language string','If all pass → set validation_passed = True and continue','If any fail → write rejection message to answer and stop graph'],
+    writes:[['validation_passed','bool','True = proceed, False = graph ends here'],['answer','str','Rejection message (only written on failure)'],['execution_log','list','Timing and result for this step']],
+    note:'Prevents wasted LLM calls. A rejected query costs zero API tokens.',
+    file:'backend/graph/nodes.py → input_guardrail_node()\nbackend/guardrails/input_validator.py'
+  },
+  generalcheck:{
+    ico:'🔍',title:'General Check Node',sub:'Binary classifier — supply chain or off-topic?',color:'#b45309',
+    summary:'Asks the LLM to classify the query. A keyword safety net overrides the LLM if supply chain signal words are present — so supply chain queries never slip through to the general path.',
+    reads:[['query','str','The validated user query']],
+    steps:['Send binary classification prompt to LLM → expects {"is_supply_chain": true/false}','If LLM returns false: check query against 30+ supply chain keywords (supplier, shipment, warehouse…)','Keyword match overrides LLM → force true','Route to general_node if false, nlsql_node if true'],
+    writes:[['routed_agents','List[str]','["supply_chain"] or ["general"]'],['execution_log','list','Classification result and timing']],
+    note:'Keyword override prevents the LLM from accidentally routing a supply chain query to the simple general path.',
+    file:'backend/graph/nodes.py → general_check_node()'
+  },
+  general:{
+    ico:'💬',title:'General Node',sub:'Handles off-topic queries',color:'#475569',
+    summary:'For queries with no supply chain content. Answers directly using the LLM — no SQL, no retrieval, no specialist agents.',
+    reads:[['query','str','The off-topic query']],
+    steps:['Call BaseAgent().answer_general(query)','Simple LLM prompt — no data fetching','Return direct answer → graph ends after this'],
+    writes:[['answer','str','The LLM response'],['confidence_score','float','Typically 0.8'],['execution_log','list','Step timing']],
+    file:'backend/graph/nodes.py → general_node()\nbackend/agents/base_agent.py → answer_general()'
+  },
+  nlsql:{
+    ico:'🗃️',title:'NL → SQL Agent',sub:'Natural language to structured database query',color:'#1d4ed8',
+    summary:'Translates the user query to SQL, executes it against PostgreSQL, and extracts named entities (suppliers, warehouses, products). These entity names anchor all downstream ChromaDB retrieval.',
+    reads:[['query','str','The user query']],
+    steps:['LLM generates SQL from query using the DB schema as context','Execute SQL against the supply chain PostgreSQL database','Parse result rows into entity categories: supplier_names, warehouse_names, product_names','Produce a human-readable SQL answer summarising the data'],
+    writes:[['sql_result','str','The SQL query/queries executed'],['sql_data','str','Raw tabular output rows — used for faithfulness grounding'],['sql_entities','dict','{supplier_names:[], warehouse_names:[], product_names:[]}'],['answer','str','Initial SQL-based answer (may be overwritten by summary_node)'],['confidence_score','float','SQL confidence score']],
+    note:'sql_entities are critical — downstream retrieval uses these exact names (e.g. "TechNova Ltd") to filter ChromaDB, ensuring only relevant documents are fetched.',
+    file:'backend/graph/nodes.py → nlsql_node()\nbackend/agents/nlsql_agent.py'
+  },
+  classify:{
+    ico:'🎯',title:'Classify Node',sub:'Specialist router and sub-question author',color:'#7c3aed',
+    summary:'Decides which of the three specialist agents are needed, in what order they should run, and writes a focused, standalone sub-question for each one using SQL entity names.',
+    reads:[['query','str','The user query'],['sql_entities','dict','Entity names extracted by NL→SQL']],
+    steps:['Build entity context: "SQL identified suppliers: TechNova, GlobalParts…"','Send entity context + query to LLM with routing instructions','LLM returns ordered agent list with sub-questions (e.g. {"agents":[{"name":"inventory","sub_query":"…"}]})','Keyword fallback if LLM fails','Return [] if SQL answer alone is sufficient → skip all specialists'],
+    writes:[['routed_agents','List[str]','Ordered list e.g. ["inventory","supplier"]'],['agent_sub_queries','dict','Per-agent focused question e.g. {"inventory":"which warehouse has highest stock?"}']],
+    note:'Ordering rule: stock/warehouse focus → inventory first; supplier/risk focus → supplier first; delays → shipment first. Sub-questions are also what the evaluation system uses — each agent is judged against its own sub-question, not the full query.',
+    file:'backend/graph/nodes.py → classify_node()'
+  },
+  orchestrator:{
+    ico:'🎛️',title:'Orchestrator Node',sub:'Sequential agent execution manager',color:'#4f46e5',
+    summary:'Runs specialists one by one in the classifier-determined order. Findings accumulate in a shared dict — each agent receives all prior agents\' results before it runs.',
+    reads:[['routed_agents','List[str]','Ordered specialist list from classify_node'],['agent_sub_queries','dict','Focused sub-question per agent'],['sql_entities','dict','Entity names for targeted retrieval']],
+    steps:['Read ordered agent list from state','For each agent: get its focused sub-question from agent_sub_queries','Call _targeted_docs(agent_name, state) → fetch role-specific documents from ChromaDB','Call _run_agent(name, sub_query, state, findings_so_far, docs)','Store result in findings dict immediately','Next agent inherits all prior findings — enabling cross-agent reasoning','Log risk_level, confidence, timing, top finding per agent'],
+    writes:[['agent_findings','dict','Keyed by agent name: {"inventory":{…},"supplier":{…}}'],['execution_log','list','Per-agent entries with risk, confidence, timing']],
+    note:'Sequential (not parallel) by design — the supplier agent can reference a stockout that the inventory agent already found, enabling compound risk detection within a single query.',
+    file:'backend/graph/nodes.py → orchestrator_node()'
+  },
+  retrieval:{
+    ico:'🗄️',title:'Targeted Retrieval',sub:'_targeted_docs() — called per agent inside the orchestrator',color:'#0e7490',
+    summary:'Each specialist gets its own document fetch using its focused sub-question and role-specific filters. Profile docs (pre-aggregated summaries) are guaranteed first; shipment events fill remaining slots.',
+    reads:[['agent sub-question','str','From agent_sub_queries — steers semantic search'],['sql_entities','dict','Supplier/warehouse names for ChromaDB filters'],['agent role','str','Determines which profile type and filter to use']],
+    steps:['Fetch profile docs with exact entity filter (supplier_profile or warehouse_profile)','Fetch shipment event docs via hybrid BM25 + semantic search','Rerank shipment docs: 0.7×hybrid + 0.2×term_overlap + 0.1×severity_boost','Merge: profile docs first (guaranteed), reranked shipment events fill remaining slots','If fewer than 2 docs found → inline fallback: unfiltered search with sub-question'],
+    writes:[['docs (local)','list','Passed directly to the agent — not stored in state']],
+    note:'Each agent gets role-specific docs: Supplier → supplier_profile + filtered shipments. Inventory → warehouse_profile + filtered shipments. Shipment → shipment events only. This is more focused than giving everyone the same pool.',
+    file:'backend/graph/nodes.py → _targeted_docs()\nbackend/retrieval/hybrid_search.py\nbackend/retrieval/reranker.py'
+  },
+  supplier:{
+    ico:'🏭',title:'Supplier Risk Agent',sub:'Supplier performance and reliability analysis',color:'#dc2626',
+    summary:'Analyzes supplier data from profile docs and shipment events to assess risk tier, delivery reliability, defect rates, and lead time variance.',
+    reads:[['sub_query','str','Focused question from classify_node'],['docs','list','supplier_profile docs + filtered shipment events'],['sql_entities','dict','Supplier/warehouse names for context'],['prior_findings','dict','Results from agents that ran before this one']],
+    steps:['Parse supplier profile metrics: reliability score, on-time rate, defect rate, risk tier','Analyze shipment events for delay patterns per supplier','Cross-reference with prior agent findings if available','Classify overall risk: low / medium / high','Produce a findings list with specific data points per supplier'],
+    writes:[['agent_findings["supplier"]','dict','risk_level, confidence, findings[], affected_suppliers[], summary']],
+    file:'backend/agents/supplier_risk_agent.py → SupplierRiskAgent().analyze()'
+  },
+  shipment:{
+    ico:'🚢',title:'Shipment Agent',sub:'Delivery route and carrier disruption analysis',color:'#1d4ed8',
+    summary:'Analyzes shipment event records to identify active delays, high-risk routes, carrier performance issues, and regional disruption patterns.',
+    reads:[['sub_query','str','Focused question from classify_node'],['docs','list','Shipment event records filtered by warehouse or supplier name'],['prior_findings','dict','Results from agents that ran before this one']],
+    steps:['Identify delayed shipments: count, duration, severity','Group by route, carrier, and shipping mode','Detect regional patterns (LATAM, Europe, USCA, Pacific, Africa)','Cross-reference with prior agent findings if available','Classify risk and list at-risk shipments with specifics'],
+    writes:[['agent_findings["shipment"]','dict','risk_level, confidence, findings[], at_risk_shipments[], summary']],
+    file:'backend/agents/shipment_agent.py → ShipmentAgent().analyze()'
+  },
+  inventory:{
+    ico:'📦',title:'Inventory Agent',sub:'Stock level and warehouse health analysis',color:'#065f46',
+    summary:'Analyzes warehouse profiles and stock data to assess days of supply, stockout risk, and capacity utilization across fulfillment hubs.',
+    reads:[['sub_query','str','Focused question from classify_node'],['docs','list','warehouse_profile docs + filtered shipment events'],['sql_answer','str','Structured SQL output — used for grounding to prevent hallucination'],['prior_findings','dict','Results from agents that ran before this one']],
+    steps:['Parse warehouse profiles: stock levels, capacity, utilization %','Calculate days of supply per warehouse','Identify products near stockout threshold','Assess reorder trigger status','Cross-reference with SQL data for faithfulness','Classify risk and list at-risk warehouses'],
+    writes:[['agent_findings["inventory"]','dict','risk_level, confidence, findings[], at_risk_warehouses[], summary']],
+    file:'backend/agents/inventory_agent.py → InventoryAgent().analyze()'
+  },
+  summary:{
+    ico:'✦',title:'Summary Node',sub:'Cross-agent synthesis and anomaly detection',color:'#065f46',
+    summary:'Aggregates all agent findings into a single answer and detects compound risk patterns where multiple agent findings correlate.',
+    reads:[['query','str','Original user query'],['agent_findings','dict','All specialist agent results combined']],
+    steps:['Call SummaryAgent().summarize(query, all_findings) → produce final narrative answer','Run anomaly correlation: Supplier+Inventory cascade, Shipment+Supplier compound, Inventory+Shipment stockout','Compute overall confidence = average of all agent confidences','Overwrite answer in state with the synthesized version'],
+    writes:[['answer','str','Final synthesized response shown to the user'],['anomaly_correlations','list','Cross-agent risk patterns detected'],['confidence_score','float','Average confidence across all agents']],
+    note:'Three anomaly patterns: (1) Supplier→Inventory Cascade [high]: supplier risk=high & inventory risk≥medium. (2) Shipment+Supplier Compound [high]: shipment risk=high & supplier risk≥medium. (3) Inventory+Shipment Stockout [medium]: inventory risk=high & shipment risk≥medium.',
+    file:'backend/graph/nodes.py → summary_node()\nbackend/agents/summary_agent.py'
+  },
+  recommendation:{
+    ico:'💡',title:'Recommendation Node',sub:'Final node — generates actionable output',color:'#065f46',
+    summary:'Generates prioritized, concrete recommendations based on all findings. Runs on both paths: after summary (full analysis) and directly after classify (SQL-only path).',
+    reads:[['query','str','Original user query'],['agent_findings','dict','All findings accumulated during the pipeline']],
+    steps:['Call RecommendationAgent().analyze(query, all_findings)','Review findings from all agents (nlsql, supplier, shipment, inventory)','Generate prioritized recommendations with specific actions and affected entities','Return — graph ends after this node'],
+    writes:[['recommendations','List[dict]','Each has title, action, priority, affected_entities'],['execution_log','list','Final step entry']],
+    file:'backend/graph/nodes.py → recommendation_node()\nbackend/agents/recommendation_agent.py'
+  }
+};
+
+let active = null;
+
+function show(id, btn) {
+  const d = D[id]; if(!d) return;
+  if(active) active.classList.remove('active');
+  active = btn; btn.classList.add('active');
+
+  document.getElementById('pBar').style.background = d.color;
+  document.getElementById('pIco').textContent = d.ico;
+  document.getElementById('pTitle').textContent = d.title;
+  document.getElementById('pSub').textContent = d.sub;
+
+  const reads  = (d.reads  ||[]).map(([n,t,x])=>`<div class="field-row"><span class="field-name">${n}</span><span class="field-desc"><em style="color:var(--amber);font-style:normal">${t}</em> — ${x}</span></div>`).join('');
+  const outs   = (d.writes ||[]).map(([n,t,x])=>`<div class="field-row"><span class="field-name">${n}</span><span class="field-desc"><em style="color:var(--amber);font-style:normal">${t}</em> — ${x}</span></div>`).join('');
+  const steps  = (d.steps  ||[]).map((s,i)=>`<div class="step-li"><div class="step-n">${i+1}</div><div class="step-t">${s}</div></div>`).join('');
+  const note   = d.note ? `<div class="note-box">💡 ${d.note}</div>` : '';
+  const file   = d.file ? `<div class="file-box">📁 ${d.file.replace(/\n/g,'<br>')}</div>` : '';
+
+  document.getElementById('pBody').innerHTML = `
+    <div class="ps"><div class="p-summary">${d.summary}</div></div>
+    <div class="ps">
+      <div class="ps-h">📥 Reads from State</div>
+      <div class="io-box">${reads}</div>
+    </div>
+    <div class="ps">
+      <div class="ps-h">⚙️ What Happens Inside</div>
+      <div class="io-box">${steps}</div>
+    </div>
+    <div class="ps">
+      <div class="ps-h">📤 Writes to State</div>
+      <div class="io-box">${outs}</div>
+    </div>
+    ${note ? `<div class="ps">${note}</div>` : ''}
+    ${file ? `<div class="ps">${file}</div>` : ''}
+  `;
+
+  document.getElementById('panel').classList.add('open');
+  document.getElementById('flowArea').classList.add('shifted');
+}
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+  document.getElementById('flowArea').classList.remove('shifted');
+  if(active){ active.classList.remove('active'); active=null; }
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closePanel(); });
+</script>
+</body>
+</html>

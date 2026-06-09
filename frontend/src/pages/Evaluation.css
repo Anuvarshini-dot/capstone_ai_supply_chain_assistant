@@ -7,6 +7,33 @@
   gap: 24px;
 }
 
+/* ── Query banner ───────────────────────────────────────────────── */
+.eval-query-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+
+.eval-query-banner__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.eval-query-banner__text {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-style: italic;
+}
+
 /* ── Header ─────────────────────────────────────────────────────── */
 .eval-header {
   display: flex;
@@ -189,6 +216,50 @@
 }
 
 .eval-detail-chip strong { color: var(--text-primary); }
+
+/* ── Section header ─────────────────────────────────────────────── */
+.eval-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.eval-section-header__title {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-primary);
+}
+
+.eval-section-header__sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Agent sections ──────────────────────────────────────────────── */
+.eval-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.eval-agent-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eval-agent-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
 
 /* ── Footer note ────────────────────────────────────────────────── */
 .eval-note {

@@ -3,18 +3,36 @@ import { useAppContext } from '../context/AppContext'
 import './Evaluation.css'
 
 const METRIC_META = {
-  retrieval_quality:     { label: 'Retrieval Quality',    icon: '🔍', desc: 'Avg hybrid score (semantic + BM25) of retrieved docs, plus how many score above the quality threshold.' },
-  context_coverage:      { label: 'Context Coverage',     icon: '🗂️', desc: 'How many distinct entity types (shipment, supplier, warehouse) appear in the retrieved context — broader coverage means richer grounding.' },
-  answer_relevancy:      { label: 'Answer Relevancy',     icon: '🎯', desc: 'Domain-aware GEval: does the answer address the query? Comprehensive answers with supplier risk, inventory status, and recommendations are expected and not penalised.' },
-  faithfulness:          { label: 'Faithfulness',          icon: '📌', desc: 'Context ↔ Answer: is every claim in the answer supported by the retrieved context? Low score signals hallucination risk.' },
-  contextual_relevancy:  { label: 'Contextual Relevancy', icon: '🔗', desc: 'Domain-aware GEval: is the retrieved context (warehouse profiles, supplier data, SQL results, shipment records) useful for the query?' },
-  deepeval_unavailable:  { label: 'DeepEval',             icon: '⚠',  desc: null },
-  deepeval_error:        { label: 'DeepEval Error',        icon: '⚠',  desc: null },
+  // Pipeline
+  retrieval_quality:            { label: 'Retrieval Quality',           icon: '🔍', desc: 'Avg hybrid score (semantic + BM25) of retrieved docs.' },
+  context_coverage:             { label: 'Context Coverage',            icon: '🗂️', desc: 'Distinct entity types in retrieved context — broader = richer grounding.' },
+  answer_relevancy:             { label: 'Answer Relevancy',            icon: '🎯', desc: 'Does the answer address the query? Comprehensive risk context is expected and not penalised.' },
+  faithfulness:                 { label: 'Faithfulness',                icon: '📌', desc: 'Is every claim in the answer supported by retrieved context? Low score = hallucination risk.' },
+  contextual_relevancy:         { label: 'Contextual Relevancy',        icon: '🔗', desc: 'Is the retrieved context useful for the query?' },
+  // Supplier agent
+  risk_assessment_quality:      { label: 'Risk Assessment Quality',     icon: '🏭', desc: 'Does the supplier analysis reference concrete metrics (on-time rate, defect rate, reliability score)?' },
+  finding_relevance:            { label: 'Finding Relevance',           icon: '📋', desc: 'Are the agent findings relevant to the query?' },
+  // Shipment agent
+  delay_analysis_quality:       { label: 'Delay Analysis Quality',      icon: '🚚', desc: 'Does shipment analysis cite specific delays, carriers, or route issues?' },
+  // Inventory agent
+  inventory_assessment_quality: { label: 'Inventory Assessment Quality',icon: '📦', desc: 'Does inventory analysis name specific products or warehouses with concrete stock figures?' },
+  // NL→SQL agent
+  sql_data_accuracy:            { label: 'SQL Data Accuracy',           icon: '🗃️', desc: 'Does the SQL result contain concrete figures and named entities?' },
+  // Summary
+  answer_completeness:          { label: 'Answer Completeness',         icon: '✦',  desc: 'Does the final answer incorporate key insights from all agents that ran?' },
+  conciseness:                  { label: 'Conciseness',                 icon: '✂️', desc: 'Is the answer focused, well-structured, and free of unnecessary repetition?' },
+}
+
+const AGENT_META = {
+  supplier:  { label: 'Supplier Risk Agent',  icon: '🏭' },
+  shipment:  { label: 'Shipment Agent',       icon: '🚚' },
+  inventory: { label: 'Inventory Agent',      icon: '📦' },
+  nlsql:     { label: 'NL→SQL Agent',         icon: '🗃️' },
 }
 
 function ScoreBar({ score, threshold }) {
   if (score == null) return <div className="score-bar-empty">—</div>
-  const pct = Math.round(score * 100)
+  const pct   = Math.round(score * 100)
   const color = score >= threshold ? 'var(--success, #22c55e)' : '#ef4444'
   return (
     <div className="eval-score-bar">
@@ -24,7 +42,7 @@ function ScoreBar({ score, threshold }) {
 }
 
 function MetricCard({ metricKey, data }) {
-  const meta = METRIC_META[metricKey] || { label: metricKey, icon: '📊', desc: null }
+  const meta   = METRIC_META[metricKey] || { label: metricKey, icon: '📊', desc: null }
   const passed = data.passed
   const score  = data.score
 
@@ -68,15 +86,53 @@ function MetricCard({ metricKey, data }) {
   )
 }
 
+function SectionHeader({ title, subtitle }) {
+  return (
+    <div className="eval-section-header">
+      <span className="eval-section-header__title">{title}</span>
+      {subtitle && <span className="eval-section-header__sub">{subtitle}</span>}
+    </div>
+  )
+}
+
+function AgentSection({ agentName, metrics }) {
+  const meta = AGENT_META[agentName] || { label: agentName, icon: '🤖' }
+  return (
+    <div className="eval-agent-section">
+      <div className="eval-agent-label">
+        <span>{meta.icon}</span>
+        <span>{meta.label}</span>
+      </div>
+      <div className="eval-grid">
+        {Object.entries(metrics).map(([key, data]) => (
+          <MetricCard key={key} metricKey={key} data={data} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const PIPELINE_KEYS = ['retrieval_quality', 'context_coverage', 'answer_relevancy', 'faithfulness', 'contextual_relevancy']
+
 export default function Evaluation() {
-  const { lastResult } = useAppContext()
+  const { lastResult, queryHistory } = useAppContext()
+  const lastQuery = queryHistory[0]?.query
 
-  const evaluation    = lastResult?.evaluation ?? {}
-  const confidence    = lastResult?.confidence_score ?? null
-  const routedAgents  = lastResult?.routed_agents ?? []
-  const numIncidents  = lastResult?.retrieved_incidents?.length ?? 0
+  const evaluation       = lastResult?.evaluation ?? {}
+  const confidence       = lastResult?.confidence_score ?? null
+  const routedAgents     = lastResult?.routed_agents ?? []
+  const numIncidents     = lastResult?.retrieved_incidents?.length ?? 0
 
-  const hasMetrics = Object.keys(evaluation).length > 0
+  const pipelineMetrics  = Object.fromEntries(
+    Object.entries(evaluation).filter(([k]) => PIPELINE_KEYS.includes(k))
+  )
+  const agentEvaluations = evaluation.agent_evaluations ?? {}
+  const summaryEval      = evaluation.summary_evaluation ?? {}
+
+  const hasPipeline = Object.keys(pipelineMetrics).length > 0
+  const hasAgents   = Object.keys(agentEvaluations).length > 0
+  const hasSummary  = Object.keys(summaryEval).length > 0
+  const hasAnything = hasPipeline || hasAgents || hasSummary
 
   if (!lastResult) {
     return (
@@ -84,7 +140,7 @@ export default function Evaluation() {
         <div className="eval-empty">
           <div className="eval-empty__icon">📊</div>
           <h2>No query evaluated yet</h2>
-          <p>Run a query on the Query tab first. Evaluation metrics will appear here dynamically after each retrieval.</p>
+          <p>Run a query on the Query tab first. Evaluation metrics will appear here after each retrieval.</p>
         </div>
       </div>
     )
@@ -92,6 +148,13 @@ export default function Evaluation() {
 
   return (
     <div className="eval-page">
+      {lastQuery && (
+        <div className="eval-query-banner">
+          <span className="eval-query-banner__label">Query</span>
+          <span className="eval-query-banner__text">{lastQuery}</span>
+        </div>
+      )}
+
       <div className="eval-header">
         <div>
           <h1 className="eval-title">DeepEval Metrics</h1>
@@ -119,25 +182,51 @@ export default function Evaluation() {
         </div>
       </div>
 
-      {!hasMetrics ? (
+      {!hasAnything ? (
         <div className="eval-empty">
           <p>No evaluation metrics available for this result.</p>
         </div>
       ) : (
-        <div className="eval-grid">
-          {Object.entries(evaluation).map(([key, data]) => (
-            <MetricCard key={key} metricKey={key} data={data} />
-          ))}
-        </div>
+        <>
+          {hasPipeline && (
+            <>
+              <SectionHeader title="Pipeline Metrics" subtitle="Retrieval and answer quality across the full query pipeline" />
+              <div className="eval-grid">
+                {Object.entries(pipelineMetrics).map(([key, data]) => (
+                  <MetricCard key={key} metricKey={key} data={data} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {hasAgents && (
+            <>
+              <SectionHeader title="Agent Evaluations" subtitle="Per-agent quality scores for each specialist that ran" />
+              <div className="eval-agents">
+                {Object.entries(agentEvaluations).map(([agentName, metrics]) => (
+                  <AgentSection key={agentName} agentName={agentName} metrics={metrics} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {hasSummary && (
+            <>
+              <SectionHeader title="Summary Evaluation" subtitle="Final answer quality — completeness, relevancy, and conciseness" />
+              <div className="eval-grid">
+                {Object.entries(summaryEval).map(([key, data]) => (
+                  <MetricCard key={key} metricKey={key} data={data} />
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
 
       <div className="eval-note">
-        <strong>Answer Relevancy</strong> and <strong>Contextual Relevancy</strong> use
-        domain-aware GEval judges that understand comprehensive supply chain answers — risk context,
-        inventory data, and recommendations alongside the direct answer are expected and not penalised.{' '}
-        <strong>Faithfulness</strong> uses a standard DeepEval judge to detect hallucinations.{' '}
-        <strong>Retrieval Quality</strong> and <strong>Context Coverage</strong> are non-LLM metrics
-        computed directly from document scores and metadata.
+        <strong>Pipeline Metrics</strong> run on every query regardless of which agents were used.{' '}
+        <strong>Agent Evaluations</strong> show per-agent quality scores — only agents that ran appear.{' '}
+        <strong>Summary Evaluation</strong> checks the final synthesised answer for completeness, relevancy, and conciseness.
         All metrics update automatically after each query.
       </div>
     </div>
